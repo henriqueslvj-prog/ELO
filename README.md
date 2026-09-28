@@ -1,16 +1,27 @@
-# ELO — V0.2 Fundação
+# ELO — Gestão, Organização, Resultados
 
-Sistema privado de gestão. Esta versão adiciona a fundação de autenticação e controle interno de usuários.
+Fundação do sistema privado ELO, com autenticação via Supabase.
 
-## Configuração
-1. Crie um projeto no Supabase.
-2. Execute `supabase/schema.sql` no SQL Editor.
-3. Crie `.env` a partir de `.env.example` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-4. Instale dependências com `npm install` e rode `npm run dev`.
-5. Publique a Edge Function `supabase/functions/admin-create-user` e configure a secret `SUPABASE_SERVICE_ROLE_KEY` no ambiente da função.
+## Configuração local
 
-## Primeiro administrador
-O primeiro administrador deve ser criado de forma controlada no Supabase Auth. Depois, insira/atualize o respectivo registro em `public.profiles` com `role='administrador'` e `status='ativo'`.
+1. Copie `.env.example` para `.env`.
+2. Preencha:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+3. Execute `npm install`.
+4. Execute `npm run dev`.
 
-## Modelo de acesso
-Não existe cadastro público. O administrador cria os demais usuários internamente. Usuários inativos continuam preservados para manter histórico.
+## Supabase
+
+O `supabase/schema.sql` cria a tabela `profiles`, RLS, função de administrador e trigger de perfil.
+
+Para criar o primeiro acesso:
+- Supabase → Authentication → Users → Add user.
+- Confirme o usuário.
+- No SQL Editor, altere o `role` para `administrador` e `status` para `ativo`.
+
+A tela de login não possui cadastro público. O frontend valida também se existe um perfil ativo para o usuário autenticado.
+
+## Criação interna de usuários
+
+A função `supabase/functions/admin-create-user/index.ts` deve ser publicada como Edge Function `admin-create-user` e receber `SUPABASE_SERVICE_ROLE_KEY` como secret. A Service Role Key nunca deve ser colocada no frontend.
