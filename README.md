@@ -1,22 +1,16 @@
-# NEXO — Gestão, Organização e Performance
+# ELO — V0.2 Fundação
 
-Protótipo inicial V1 do sistema de gestão inspirado no conceito visual definido para o projeto.
+Sistema privado de gestão. Esta versão adiciona a fundação de autenticação e controle interno de usuários.
 
-## O que já está incluído
-- Identidade visual baseada na logo fornecida.
-- Dashboard inicial.
-- Menu lateral oculto por padrão e aberto por botão.
-- Navegação entre módulos.
-- Demandas, Solicitações, Ideias e Projetos em formato de tabela.
-- Placeholders estruturais para Arquivos, Destaques, Agenda, Reuniões e Indicadores.
-- Tema escuro e alternância para modo claro.
-- Layout responsivo para desktop e mobile.
+## Configuração
+1. Crie um projeto no Supabase.
+2. Execute `supabase/schema.sql` no SQL Editor.
+3. Crie `.env` a partir de `.env.example` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+4. Instale dependências com `npm install` e rode `npm run dev`.
+5. Publique a Edge Function `supabase/functions/admin-create-user` e configure a secret `SUPABASE_SERVICE_ROLE_KEY` no ambiente da função.
 
-## Rodar localmente
-```bash
-npm install
-npm run dev
-```
+## Primeiro administrador
+O primeiro administrador deve ser criado de forma controlada no Supabase Auth. Depois, insira/atualize o respectivo registro em `public.profiles` com `role='administrador'` e `status='ativo'`.
 
-## Próxima etapa
-Conectar Supabase para autenticação, banco de dados, permissões, arquivos e persistência dos registros.
+## Modelo de acesso
+Não existe cadastro público. O administrador cria os demais usuários internamente. Usuários inativos continuam preservados para manter histórico.
