@@ -1,12 +1,31 @@
-# ELO — Solicitações V0.7
+# ELO — Gestão, Organização, Resultados
 
-Fluxo:
-NOVA → EM ANÁLISE → APROVADA / RECUSADA → DEMANDA GERADA
+Fundação do sistema privado ELO, com autenticação via Supabase.
 
-O módulo registra solicitante, responsável pela análise, título, descrição,
-categoria, prioridade, prazo desejado, status e observações.
+## Configuração local
 
-Também cria o vínculo `solicitacao_id` em Demandas quando a tabela já existir,
-permitindo rastrear a origem de uma demanda.
+1. Copie `.env.example` para `.env`.
+2. Preencha:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+3. Execute `npm install`.
+4. Execute `npm run dev`.
 
-Execute `solicitacoes_v0_7.sql` no SQL Editor do Supabase.
+## Supabase
+
+O `supabase/schema.sql` cria a tabela `profiles`, RLS, função de administrador e trigger de perfil.
+
+Para criar o primeiro acesso:
+- Supabase → Authentication → Users → Add user.
+- Confirme o usuário.
+- No SQL Editor, altere o `role` para `administrador` e `status` para `ativo`.
+
+A tela de login não possui cadastro público. O frontend valida também se existe um perfil ativo para o usuário autenticado.
+
+## Criação interna de usuários
+
+A função `supabase/functions/admin-create-user/index.ts` deve ser publicada como Edge Function `admin-create-user` e receber `SUPABASE_SERVICE_ROLE_KEY` como secret. A Service Role Key nunca deve ser colocada no frontend.
+
+
+## Solicitações V0.7
+Execute `supabase/solicitacoes.sql` depois da fundação e do módulo Demandas. A interface já está integrada ao frontend e grava no Supabase.
