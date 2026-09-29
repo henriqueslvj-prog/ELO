@@ -38,3 +38,60 @@
 @media(max-width:1000px){.demandToolbar{grid-template-columns:1fr 1fr}.demandToolbar .search{grid-column:1/-1}.demandToolbar>.primary{justify-self:stretch}}
 @media(max-width:650px){.demandToolbar{grid-template-columns:1fr 1fr}.demandToolbar .search{grid-column:1/-1}.demandToolbar>.primary{grid-column:1/-1}.demandSummary{grid-template-columns:1fr 1fr}.demandSummary>div{min-height:76px;padding:14px}.demandSummary b{font-size:22px}.demandModal{padding:20px;border-radius:18px}.formGrid{grid-template-columns:1fr}.demandForm textarea{min-height:90px}.demandRow{grid-template-columns:minmax(220px,2fr) 100px 120px 95px 120px 62px;padding-left:13px;padding-right:13px}}
 @media(max-width:430px){.demandToolbar{grid-template-columns:1fr}.demandToolbar .search,.demandToolbar>.primary{grid-column:auto}.demandSummary{gap:8px}.demandSummary>div{padding:12px}.demandSummary b{font-size:20px}.demandSummary span{font-size:9px}.demandModal{padding:17px}.demandModal .modalHead h2{font-size:19px}}
+
+/* =========================================================
+   ELO — Solicitações V0.7.1 | refinamento visual + ação superior
+   ========================================================= */
+.headingAction{min-width:168px;height:44px;padding:0 18px;display:inline-flex;align-items:center;justify-content:center}
+.solicitacoesPage{display:grid;gap:16px}
+.requestSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:0}
+.requestStat{position:relative;min-height:122px;padding:16px 18px 15px;background:linear-gradient(145deg,rgba(11,31,22,.98),rgba(6,19,14,.98));border:1px solid rgba(255,255,255,.075);border-radius:16px;overflow:hidden;box-shadow:0 12px 35px rgba(0,0,0,.12)}
+.requestStat:after{content:"";position:absolute;right:-36px;top:-42px;width:105px;height:105px;border-radius:50%;background:rgba(25,202,126,.055);filter:blur(2px)}
+.requestStat:before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,rgba(39,210,137,.7),transparent 72%)}
+.requestStatTop{display:flex;align-items:center;gap:8px;color:#638176;font-size:8px;font-weight:800;letter-spacing:1.2px;margin-bottom:12px}
+.requestStatIcon{width:27px;height:27px;border-radius:8px;display:grid;place-items:center;background:#0a3323;color:#42d393;font-size:12px;box-shadow:inset 0 0 0 1px rgba(66,211,147,.08)}
+.requestStat strong{display:block;font-size:27px;line-height:1;margin-bottom:5px;color:#edf8f3}
+.requestStat b{display:block;font-size:12px;color:#d6e6df;margin-bottom:3px}
+.requestStat small{display:block;color:#668076;font-size:9px}
+.solicitacaoToolbar{grid-template-columns:minmax(300px,1fr) 190px 190px;gap:10px;padding:2px 0}
+.solicitacaoToolbar .search{height:46px;border-radius:13px;background:rgba(7,24,17,.9)}
+.solicitacaoToolbar .filterSelect{height:46px;border-radius:13px}
+.solicitacaoTablePanel{padding:0;border-radius:18px;background:linear-gradient(145deg,rgba(8,24,17,.98),rgba(5,17,12,.98))}
+.solicitacaoTablePanel .table{width:100%}
+.solicitacaoTablePanel .tr{grid-template-columns:minmax(260px,2.3fr) 1fr 120px 1.1fr 100px 120px 42px;min-width:920px;padding:14px 18px}
+.solicitacaoTablePanel .tr.th{padding-top:12px;padding-bottom:11px;background:rgba(11,29,21,.78);color:#668176;font-size:8px;letter-spacing:1px}
+.solicitacaoTablePanel .tr:not(.th){min-height:66px;background:rgba(255,255,255,.006);transition:background .16s ease}
+.solicitacaoTablePanel .tr:not(.th):hover{background:rgba(29,205,132,.035)}
+.solicitacaoTablePanel .tr>span:first-child{min-width:0}
+.solicitacaoTablePanel .tr>span:first-child b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#dcebe4;font-size:12px}
+.solicitacaoTablePanel .tr>span:first-child small{display:block;margin-top:5px;color:#5d786b;font-size:9px;text-transform:uppercase;letter-spacing:.55px}
+.solicitacaoTablePanel .tr>span{color:#a5b9b0;font-size:10px}
+.solicitacaoTablePanel .tr>span:nth-child(3){color:#e1b25e;font-weight:700}
+.solicitacaoTablePanel .tr>span:nth-child(6){display:inline-flex;align-items:center;width:max-content;padding:6px 9px;border-radius:8px;background:rgba(48,205,137,.09);color:#58d99d;font-size:9px;font-weight:800}
+.solicitacaoTablePanel .more button{width:30px;height:30px;border:1px solid rgba(255,255,255,.07);border-radius:9px;background:#0a1d15;color:#789287;cursor:pointer}
+.solicitacaoTablePanel .more button:hover{background:#0d3324;color:#5ad99d;border-color:rgba(58,210,142,.22)}
+.solicitacaoTablePanel .emptyState{min-height:230px;display:grid;place-content:center;text-align:center;padding:30px 20px;line-height:1.6;color:#60796e}
+.solicitacaoTablePanel .emptyState:before{content:"✓";display:grid;place-items:center;width:44px;height:44px;margin:0 auto 12px;border-radius:13px;background:#0a2e20;color:#38cf8c;font-size:18px;box-shadow:inset 0 0 0 1px rgba(56,207,140,.08)}
+.solicitacaoModal{width:min(640px,calc(100vw - 32px));max-height:min(760px,calc(100vh - 32px));overflow:auto;padding:27px 28px;border-radius:22px;background:linear-gradient(145deg,#091b13,#06130d);border-color:rgba(91,214,158,.13)}
+.solicitacaoModal .modalHead{margin-bottom:20px}
+.solicitacaoModal .modalHead h2{font-size:21px;letter-spacing:-.3px}
+.solicitacaoModal .modalHead span{max-width:470px;line-height:1.5}
+.solicitacaoForm{gap:14px}
+.solicitacaoForm label{font-size:9px;color:#8ea79c;letter-spacing:.25px}
+.solicitacaoForm input,.solicitacaoForm textarea,.solicitacaoForm select{width:100%;border:1px solid rgba(255,255,255,.085);background:#06150e;color:#e5f1eb;border-radius:11px;outline:none;font:500 12px Inter,ui-sans-serif,sans-serif;transition:border-color .18s,box-shadow .18s,background .18s}
+.solicitacaoForm input,.solicitacaoForm select{height:43px;padding:0 13px}
+.solicitacaoForm textarea{padding:11px 13px;min-height:96px;resize:vertical;line-height:1.5}
+.solicitacaoForm textarea[rows="3"]{min-height:76px}
+.solicitacaoForm input::placeholder,.solicitacaoForm textarea::placeholder{color:#526b60}
+.solicitacaoForm input:focus,.solicitacaoForm textarea:focus,.solicitacaoForm select:focus{border-color:rgba(47,213,141,.5);box-shadow:0 0 0 3px rgba(47,213,141,.07);background:#071a11}
+.solicitacaoForm select{appearance:none;-webkit-appearance:none;padding-right:38px;background-image:linear-gradient(45deg,transparent 50%,#6f8d7e 50%),linear-gradient(135deg,#6f8d7e 50%,transparent 50%);background-position:calc(100% - 16px) 18px,calc(100% - 11px) 18px;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+.solicitacaoForm .formGrid{gap:12px}
+.solicitacaoForm .formActions{margin-top:2px;padding-top:15px;border-top:1px solid rgba(255,255,255,.06)}
+.solicitacaoForm .formActions button{height:41px;padding:0 17px}
+.light .requestStat{background:#fff;border-color:#dce9e2;box-shadow:0 12px 35px rgba(40,75,60,.06)}
+.light .requestStat:before{background:linear-gradient(90deg,rgba(25,169,102,.65),transparent 72%)}
+.light .requestStatTop{color:#70877d}.light .requestStatIcon{background:#e9f7f0;color:#149d62}.light .requestStat strong{color:#183127}.light .requestStat b{color:#30483c}.light .requestStat small{color:#71877d}
+.light .solicitacaoTablePanel{background:#fff;border-color:#dce9e2}.light .solicitacaoTablePanel .tr.th{background:#f5f9f7;color:#70877d}.light .solicitacaoTablePanel .tr{border-color:#e5eee9}.light .solicitacaoTablePanel .tr>span:first-child b{color:#20382c}.light .solicitacaoTablePanel .tr>span:first-child small{color:#71877d}.light .solicitacaoTablePanel .tr>span{color:#536c61}.light .solicitacaoTablePanel .more button{background:#f4f8f6;border-color:#dce9e2;color:#6c8378}
+.light .solicitacaoModal{background:#fff;border-color:#dce9e2}.light .solicitacaoForm input,.light .solicitacaoForm textarea,.light .solicitacaoForm select{background:#f7faf8;color:#20382c;border-color:#dce9e2}.light .solicitacaoForm input:focus,.light .solicitacaoForm textarea:focus,.light .solicitacaoForm select:focus{background:#fff}
+@media(max-width:900px){.requestSummary{grid-template-columns:repeat(2,1fr)}.solicitacaoToolbar{grid-template-columns:1fr 1fr}.solicitacaoToolbar .search{grid-column:1/-1}}
+@media(max-width:600px){.requestSummary{grid-template-columns:1fr 1fr;gap:9px}.requestStat{min-height:108px;padding:13px}.requestStat strong{font-size:23px}.requestStatTop{margin-bottom:9px}.solicitacaoToolbar{grid-template-columns:1fr}.solicitacaoToolbar .search{grid-column:auto}.solicitacaoModal{padding:21px 18px;border-radius:18px}.solicitacaoModal .modalHead h2{font-size:19px}.solicitacaoForm .formGrid{grid-template-columns:1fr}}
