@@ -37,13 +37,38 @@ Deno.serve(async (req) => {
         await new Promise(r=>setTimeout(r,1200));
       }
     }
-    const prompt=`Você é o avaliador de qualidade do ELO. Analise exclusivamente o atendimento contido no PDF. Não invente fatos. Para cada critério, dê uma nota de 0 a 10 e justifique com evidências observáveis. Se o PDF não permitir avaliar algum critério, use null e explique. Retorne SOMENTE JSON válido no formato {"criterios":[{"criterion_id":"...","score":8.5,"justification":"...","evidence":["..."]}],"resumo":"..."}. Critérios: ${JSON.stringify(criteria)}`;
-    const gen=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{file_data:{mime_type:'application/pdf',file_uri:fileUri}}]}],generationConfig:{responseMimeType:'application/json',temperature:0.1}})});
+    const prompt=`Você é o avaliador de qualidade do ELO. Analise EXCLUSIVAMENTE o atendimento contido no PDF e os critérios cadastrados abaixo.
+
+REGRAS OBRIGATÓRIAS:
+1. Não invente fatos, mensagens, horários, comportamentos ou informações que não estejam sustentados pelo PDF.
+2. Para cada critério, avalie somente o que o próprio critério descreve.
+3. Dê score de 0 a 10 somente quando houver evidência suficiente no PDF.
+4. Se não houver informação suficiente para avaliar um critério, use score = null, available = false e explique claramente o motivo. NUNCA atribua uma nota por suposição.
+5. A justificativa deve explicar objetivamente a nota usando fatos observáveis.
+6. evidence deve conter evidências curtas e rastreáveis ao PDF, preferencialmente com horário e/ou uma pequena citação literal.
+7. attention_points deve registrar falhas, riscos ou oportunidades de melhoria realmente observados. Se não houver, retorne [].
+8. Não considere o nome do colaborador, aparência, gênero, idade, sotaque ou qualquer atributo pessoal para definir a nota.
+9. Não escolha o Destaque do Mês. Você está apenas avaliando este atendimento.
+10. Retorne SOMENTE JSON válido conforme o schema solicitado.
+
+CRITÉRIOS CONFIGURADOS:
+${JSON.stringify(criteria.map((c:any)=>({id:c.id,name:c.name,description:c.description,weight:c.weight,min_score:c.min_score,required:c.required})))}
+`;
+    const responseSchema={type:'OBJECT',properties:{resumo:{type:'STRING'},criterios:{type:'ARRAY',items:{type:'OBJECT',properties:{criterion_id:{type:'STRING'},available:{type:'BOOLEAN'},score:{type:['NUMBER','NULL']},justification:{type:'STRING'},evidence:{type:'ARRAY',items:{type:'STRING'}},attention_points:{type:'ARRAY',items:{type:'STRING'}}},required:['criterion_id','available','score','justification','evidence','attention_points']}}},required:['resumo','criterios']};
+    const gen=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{file_data:{mime_type:'application/pdf',file_uri:fileUri}}]}],generationConfig:{responseMimeType:'application/json',responseSchema,temperature:0.1}})});
     if(!gen.ok) throw new Error(`Gemini análise: ${await gen.text()}`);
     const gd=await gen.json();
     const text=gd.candidates?.[0]?.content?.parts?.find((p:any)=>p.text)?.text;
     if(!text) throw new Error('A IA não retornou uma resposta válida.');
     const analysis=JSON.parse(text.replace(/^```json\s*/,'').replace(/\s*```$/,''));
+    if(!Array.isArray(analysis.criterios)) throw new Error('A resposta da IA não contém a lista de critérios.');
+    const allowed=new Set((criteria as any[]).map(c=>c.id));
+    analysis.criterios=analysis.criterios.filter((item:any)=>allowed.has(item.criterion_id)).map((item:any)=>({
+      ...item,
+      score:item.available && item.score!==null ? Math.max(0,Math.min(10,Number(item.score))) : null,
+      evidence:Array.isArray(item.evidence)?item.evidence:[],
+      attention_points:Array.isArray(item.attention_points)?item.attention_points:[]
+    }));
     await db.from('destaque_atendimentos').update({status:'analisado',analysis,analyzed_at:new Date().toISOString()}).eq('id',attendance_id);
     return json({ok:true,analysis});
   } catch (e) {

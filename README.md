@@ -57,3 +57,13 @@ PDF → Storage privado → Edge Function → Gemini → JSON estruturado → `d
 
 ### 4. Modelo utilizado
 A função está preparada para `gemini-2.5-flash`. A disponibilidade de nível sem custo e os limites de uso devem ser conferidos na documentação atual do Google antes de colocar a rotina em produção.
+
+## V0.8.1 — Gemini / análise de atendimentos
+- A Edge Function `analyze-attendance` usa `GEMINI_API_KEY` somente no servidor.
+- O PDF é enviado ao Gemini e avaliado exclusivamente contra os critérios ativos com fonte `ia`.
+- A resposta é estruturada em JSON com nota, disponibilidade, justificativa, evidências e pontos de atenção.
+- Critérios sem evidência suficiente retornam `available=false` e `score=null`.
+- A interface do ELO exibe o histórico e o resultado detalhado da análise.
+
+### Deploy da Edge Function
+Após configurar o secret `GEMINI_API_KEY` no Supabase, publique a função `analyze-attendance` pelo método de deploy de Edge Functions que você já utiliza no projeto.
