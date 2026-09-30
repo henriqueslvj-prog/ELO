@@ -46,7 +46,76 @@ function DestaquesManager({currentUser}){
  const saveCriterion=async e=>{e.preventDefault();setBusy(true);setMsg('');const payload={name:form.name,description:form.description||null,weight:Number(form.weight),source:form.source,min_score:Number(form.min_score||0),required:!!form.required,active:!!form.active};let r=form.id?await supabase.from('destaque_criterios').update(payload).eq('id',form.id):await supabase.from('destaque_criterios').insert({...payload,created_by:(await supabase.auth.getUser()).data.user.id});if(r.error)setMsg(r.error.message);else{await load();setModal(null)}setBusy(false)};
  const removeCriterion=async id=>{if(!confirm('Excluir este critério?'))return;const {error}=await supabase.from('destaque_criterios').delete().eq('id',id);if(error)setMsg(error.message);else load()};
  const createCycle=async()=>{setBusy(true);const {data,error}=await supabase.from('destaque_ciclos').insert({period_key:monthKey,period_start:`${monthKey}-01`,period_end:new Date(new Date(`${monthKey}-01T00:00:00`).getFullYear(),new Date(`${monthKey}-01T00:00:00`).getMonth()+1,0).toISOString().slice(0,10),team_name:'Equipe',status:'em_avaliacao',created_by:(await supabase.auth.getUser()).data.user.id}).select().single();if(error){setMsg(error.message)}else setCycle(data);setBusy(false)};
- const uploadAttendance=async()=>{if(!pdf||!selectedEmployee||!cycle){setMsg('Selecione o colaborador e crie/abra o ciclo antes de enviar o PDF.');return}setBusy(true);setMsg('');const uid=(await supabase.auth.getUser()).data.user.id;const path=`${uid}/${cycle.id}/${crypto.randomUUID()}-${pdf.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const up=await supabase.storage.from('destaque-atendimentos').upload(path,pdf,{contentType:'application/pdf',upsert:false});if(up.error){setMsg(up.error.message);setBusy(false);return}const {data,error}=await supabase.from('destaque_atendimentos').insert({cycle_id:cycle.id,employee_id:selectedEmployee,storage_path:path,file_name:pdf.name,status:'aguardando_analise',created_by:uid}).select().single();if(error){setMsg(error.message);setBusy(false);return}const fn=await supabase.functions.invoke('analyze-attendance',{body:{attendance_id:data.id}});if(fn.error)setMsg(fn.error.message||'PDF enviado, mas a análise não foi iniciada.');else setMsg('PDF enviado. A análise da IA foi iniciada.');await load();setPdf(null);setBusy(false)};
+ const uploadAttendance=async()=>{
+   if(!pdf||!selectedEmployee||!cycle){setMsg('Selecione o colaborador e crie/abra o ciclo antes de enviar o PDF.');return}
+   setBusy(true);setMsg('');
+   try{
+     const {data:userData,error:userError}=await supabase.auth.getUser();
+     if(userError||!userData?.user) throw new Error('Sessão do usuário não encontrada. Faça login novamente.');
+     const uid=userData.user.id;
+
+     // Busca novamente o colaborador no banco para evitar usar um ID antigo/stale do estado do navegador.
+     const {data:employee,error:employeeError}=await supabase
+       .from('destaque_colaboradores')
+       .select('id,full_name,status')
+       .eq('id',selectedEmployee)
+       .maybeSingle();
+     if(employeeError) throw new Error(`Não foi possível validar o colaborador: ${employeeError.message}`);
+     if(!employee) throw new Error('O colaborador selecionado não existe mais na equipe avaliada. Atualize a página e selecione novamente.');
+     if(employee.status!=='ativo') throw new Error('O colaborador selecionado está inativo.');
+
+     // Confirma também o ciclo atual antes de criar o atendimento.
+     const {data:cycleRow,error:cycleError}=await supabase
+       .from('destaque_ciclos')
+       .select('id')
+       .eq('id',cycle.id)
+       .maybeSingle();
+     if(cycleError||!cycleRow) throw new Error('O ciclo de avaliação não foi encontrado. Atualize a página e abra o ciclo novamente.');
+
+     const safeName=pdf.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+     const path=`${uid}/${cycle.id}/${crypto.randomUUID()}-${safeName}`;
+
+     const up=await supabase.storage
+       .from('destaque-atendimentos')
+       .upload(path,pdf,{contentType:'application/pdf',upsert:false});
+     if(up.error) throw new Error(`Falha ao enviar o PDF: ${up.error.message}`);
+
+     const {data:attendance,error:insertError}=await supabase
+       .from('destaque_atendimentos')
+       .insert({
+         cycle_id:cycle.id,
+         employee_id:employee.id,
+         storage_path:path,
+         file_name:pdf.name,
+         status:'aguardando_analise',
+         created_by:uid
+       })
+       .select()
+       .single();
+
+     if(insertError){
+       await supabase.storage.from('destaque-atendimentos').remove([path]);
+       throw new Error(`Não foi possível registrar o atendimento: ${insertError.message}`);
+     }
+
+     const fn=await supabase.functions.invoke('analyze-attendance',{body:{attendance_id:attendance.id}});
+     if(fn.error){
+       const detail=fn.data?.error||fn.error.message||'A função de análise não foi iniciada.';
+       setMsg(`PDF enviado, mas a IA não iniciou: ${detail}`);
+     }else if(fn.data?.success===false){
+       setMsg(`PDF enviado, mas a IA retornou erro: ${fn.data?.error||'Erro desconhecido.'}`);
+     }else{
+       setMsg('PDF enviado. A análise da IA foi iniciada.');
+     }
+
+     await load();
+     setPdf(null);
+   }catch(error){
+     setMsg(error instanceof Error?error.message:String(error));
+   }finally{
+     setBusy(false);
+   }
+ };
  const totalWeight=criteria.filter(c=>c.active).reduce((a,c)=>a+Number(c.weight||0),0);
  return <section className="destaquesPage">
    <div className="destaqueHero"><div><p className="eyebrow">MOTOR DE AVALIAÇÃO</p><h2>Destaque do Mês</h2><p>Configure os critérios, analise atendimentos e deixe o ELO consolidar o resultado da equipe.</p></div><div className="cycleBox"><span>PERÍODO ATUAL</span><b>{monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1)}</b><em>{cycle?'Em avaliação':'Não iniciado'}</em></div></div>

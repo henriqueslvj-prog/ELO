@@ -73,3 +73,8 @@ O módulo Destaque do Mês agora possui a aba **Equipe**, com cadastro independe
 
 ## Edge Function
 A função `supabase/functions/analyze-attendance/index.ts` recebe `attendance_id`, baixa o PDF pelo Storage autenticado e chama o Gemini para preencher os critérios de fonte IA. Configure `GEMINI_API_KEY` como Secret da Edge Function e faça o deploy de `analyze-attendance`.
+
+## V0.8.3 — Correção do fluxo de análise
+A tela de análise agora valida novamente o colaborador diretamente em `destaque_colaboradores` antes de criar `destaque_atendimentos`. Isso evita usar um ID antigo do estado do navegador e garante que `employee_id` seja o ID do cadastro da equipe avaliada.
+
+Também foi incluído `supabase/destaques-fix.sql`, uma migração segura para garantir que as foreign keys de `destaque_atendimentos` e `destaque_avaliacoes` apontem para `destaque_colaboradores(id)`.
