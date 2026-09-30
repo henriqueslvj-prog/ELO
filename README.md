@@ -67,3 +67,9 @@ A função está preparada para `gemini-2.5-flash`. A disponibilidade de nível 
 
 ### Deploy da Edge Function
 Após configurar o secret `GEMINI_API_KEY` no Supabase, publique a função `analyze-attendance` pelo método de deploy de Edge Functions que você já utiliza no projeto.
+
+## V0.8.2 — Equipe avaliada
+O módulo Destaque do Mês agora possui a aba **Equipe**, com cadastro independente dos usuários do ELO. Execute o bloco adicional ao final de `supabase/destaques.sql` no SQL Editor do Supabase antes de testar o cadastro de colaboradores.
+
+## Edge Function
+A função `supabase/functions/analyze-attendance/index.ts` recebe `attendance_id`, baixa o PDF pelo Storage autenticado e chama o Gemini para preencher os critérios de fonte IA. Configure `GEMINI_API_KEY` como Secret da Edge Function e faça o deploy de `analyze-attendance`.

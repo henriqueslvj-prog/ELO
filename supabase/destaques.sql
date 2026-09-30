@@ -140,3 +140,51 @@ with check (bucket_id='destaque-atendimentos' and public.has_permission('destaqu
 drop policy if exists destaque_storage_delete on storage.objects;
 create policy destaque_storage_delete on storage.objects for delete to authenticated
 using (bucket_id='destaque-atendimentos' and public.has_permission('destaques','delete'));
+
+-- ELO V0.8.2 — Equipe avaliada independente dos usuários do ELO
+create table if not exists public.destaque_colaboradores (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  sector text not null default 'Atendimento',
+  status text not null default 'ativo' check (status in ('ativo','inativo')),
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Migração de segurança: colaboradores que já estavam cadastrados como usuários
+-- são copiados para a equipe avaliada usando o mesmo UUID. Novos colaboradores
+-- podem ser cadastrados sem possuir conta de acesso ao ELO.
+insert into public.destaque_colaboradores (id, full_name, sector, status, created_by)
+select p.id, p.full_name, coalesce(nullif(p.job_title,''),'Atendimento'), 'ativo', p.id
+from public.profiles p
+where not exists (select 1 from public.destaque_colaboradores d where d.id=p.id);
+
+-- As avaliações e os PDFs passam a apontar para a equipe avaliada.
+alter table public.destaque_avaliacoes drop constraint if exists destaque_avaliacoes_employee_id_fkey;
+alter table public.destaque_atendimentos drop constraint if exists destaque_atendimentos_employee_id_fkey;
+alter table public.destaque_avaliacoes
+  add constraint destaque_avaliacoes_employee_id_fkey
+  foreign key (employee_id) references public.destaque_colaboradores(id) on delete restrict;
+alter table public.destaque_atendimentos
+  add constraint destaque_atendimentos_employee_id_fkey
+  foreign key (employee_id) references public.destaque_colaboradores(id) on delete restrict;
+
+create index if not exists idx_destaque_colaboradores_status on public.destaque_colaboradores(status);
+create index if not exists idx_destaque_colaboradores_name on public.destaque_colaboradores(full_name);
+
+alter table public.destaque_colaboradores enable row level security;
+drop policy if exists destaque_colaboradores_select on public.destaque_colaboradores;
+create policy destaque_colaboradores_select on public.destaque_colaboradores
+for select to authenticated using (public.has_permission('destaques','view'));
+drop policy if exists destaque_colaboradores_insert on public.destaque_colaboradores;
+create policy destaque_colaboradores_insert on public.destaque_colaboradores
+for insert to authenticated with check (public.has_permission('destaques','create'));
+drop policy if exists destaque_colaboradores_update on public.destaque_colaboradores;
+create policy destaque_colaboradores_update on public.destaque_colaboradores
+for update to authenticated using (public.has_permission('destaques','edit')) with check (public.has_permission('destaques','edit'));
+drop policy if exists destaque_colaboradores_delete on public.destaque_colaboradores;
+create policy destaque_colaboradores_delete on public.destaque_colaboradores
+for delete to authenticated using (public.has_permission('destaques','delete'));
+
+grant select, insert, update, delete on public.destaque_colaboradores to authenticated;
