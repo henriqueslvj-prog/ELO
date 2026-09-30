@@ -74,6 +74,35 @@ O módulo Destaque do Mês agora possui a aba **Equipe**, com cadastro independe
 ## Edge Function
 A função `supabase/functions/analyze-attendance/index.ts` recebe `attendance_id`, baixa o PDF pelo Storage autenticado e chama o Gemini para preencher os critérios de fonte IA. Configure `GEMINI_API_KEY` como Secret da Edge Function e faça o deploy de `analyze-attendance`.
 
+## V0.8.4 — Gemini 3.6 / PDF inline / correção de API
+
+A Edge Function `analyze-attendance` foi atualizada para a API atual do Gemini:
+
+- modelo principal: `gemini-3.6-flash`;
+- fallback temporário: `gemini-3.5-flash-lite` somente em erros de disponibilidade/capacidade;
+- autenticação pelo header `x-goog-api-key`;
+- PDF enviado como `inline_data` em `generateContent`;
+- remoção do parâmetro `temperature`, que não deve ser usado nos modelos Gemini 3.6+;
+- resposta JSON estruturada;
+- critérios sem evidência suficiente permanecem `available=false` e sem nota;
+- a IA não calcula vencedor nem ranking; o ELO continua responsável pelos pesos e elegibilidade.
+
+O fluxo agora é:
+`PDF → Storage privado → Edge Function → Gemini 3.6 Flash → JSON → ELO`.
+
+Para publicar:
+
+```bash
+supabase functions deploy analyze-attendance
+```
+
+Secret obrigatório da função:
+`GEMINI_API_KEY`
+
+A chave deve permanecer somente nos Secrets da Edge Function. Não coloque a chave no frontend/Vercel.
+
+A documentação atual do Google confirma o uso de `gemini-3.6-flash`, `x-goog-api-key`, `generateContent` e PDF inline para esse fluxo.
+
 ## V0.8.3 — Correção do fluxo de análise
 A tela de análise agora valida novamente o colaborador diretamente em `destaque_colaboradores` antes de criar `destaque_atendimentos`. Isso evita usar um ID antigo do estado do navegador e garante que `employee_id` seja o ID do cadastro da equipe avaliada.
 
