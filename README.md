@@ -104,3 +104,13 @@ Foi adicionada a aba `Base da IA` dentro de `Destaques` para visualizar as refer
 ## Próxima evolução prevista
 
 Se houver PDF sem camada de texto, o ELO poderá encaminhar o arquivo para uma segunda etapa de OCR, mantendo o mesmo motor de avaliação. Isso evita alterar a lógica dos critérios quando a origem do texto mudar.
+
+## V0.11 — Avaliação mensal por colaborador
+
+- Atendimentos ficam filtrados por colaborador e ciclo mensal.
+- A aba **Pontuação mensal** mostra a composição da avaliação de uma pessoa em um período.
+- Critérios `ia` são consolidados automaticamente pela Edge Function a partir dos atendimentos analisados no ciclo.
+- Critérios `manual` e `sistema` podem receber nota do gestor de 0 a 10 e observação.
+- As notas manuais ficam registradas em `destaque_avaliacao_itens` com usuário e data de lançamento.
+- A avaliação mensal é armazenada em `destaque_avaliacoes` e seus critérios em `destaque_avaliacao_itens`.
+- Execute `supabase/destaques-avaliacao-mensal.sql` antes de usar a nova pontuação mensal.

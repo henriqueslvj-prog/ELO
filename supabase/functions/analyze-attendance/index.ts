@@ -140,6 +140,69 @@ ${attendanceText}
 ======================`;
 };
 
+
+const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any[]) => {
+  const { data: evaluation, error: evaluationError } = await supabase
+    .from('destaque_avaliacoes')
+    .upsert({
+      cycle_id: attendance.cycle_id,
+      employee_id: attendance.employee_id,
+      status: 'em_avaliacao',
+      eligible: true,
+    }, { onConflict: 'cycle_id,employee_id' })
+    .select()
+    .single();
+
+  if (evaluationError || !evaluation) {
+    throw new Error(`Não foi possível criar/atualizar a avaliação mensal: ${evaluationError?.message || 'registro não retornado.'}`);
+  }
+
+  const { data: analyzedAttendances, error: attendanceError } = await supabase
+    .from('destaque_atendimentos')
+    .select('id,analysis,status')
+    .eq('cycle_id', attendance.cycle_id)
+    .eq('employee_id', attendance.employee_id)
+    .eq('status', 'analisado');
+
+  if (attendanceError) {
+    throw new Error(`Não foi possível consolidar os atendimentos do mês: ${attendanceError.message}`);
+  }
+
+  for (const criterion of criteria) {
+    const values: number[] = [];
+    for (const item of analyzedAttendances || []) {
+      const criterionResult = item?.analysis?.criterios?.find((x: any) =>
+        x?.criterion_id === criterion.id || x?.criterion_name === criterion.name
+      );
+      const score = normalizeScore(criterionResult?.score);
+      if (criterionResult?.available === true && score !== null) values.push(score);
+    }
+
+    if (!values.length) continue;
+
+    const average = Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+
+    const { error: itemError } = await supabase
+      .from('destaque_avaliacao_itens')
+      .upsert({
+        evaluation_id: evaluation.id,
+        criterion_id: criterion.id,
+        criterion_name_snapshot: criterion.name,
+        weight_snapshot: Number(criterion.weight || 0),
+        source_snapshot: criterion.source,
+        score: average,
+        justification: `Média consolidada automaticamente a partir de ${values.length} atendimento(s) analisado(s) no período.`,
+        evidence: { samples: values.length, scores: values },
+        ai_samples: values.length,
+        ai_updated_at: new Date().toISOString(),
+      }, { onConflict: 'evaluation_id,criterion_id' });
+
+    if (itemError) throw new Error(`Não foi possível salvar a pontuação mensal de ${criterion.name}: ${itemError.message}`);
+  }
+
+  return { evaluation_id: evaluation.id, analyzed_attendances: analyzedAttendances?.length || 0 };
+};
+
 const callGemini = async (model: string, geminiKey: string, prompt: string) => {
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -345,7 +408,9 @@ Deno.serve(async (req) => {
     const { error: saveError } = await supabase.from('destaque_atendimentos').update({ status: 'analisado', analysis, analyzed_at: analyzedAt, error_message: null }).eq('id', attendance.id);
     if (saveError) throw new Error(`Falha ao salvar análise: ${saveError.message}`);
 
-    return json({ success: true, attendance_id: attendance.id, model: usedModel, analysis });
+    const monthly = await syncMonthlyAiScores(supabase, attendance, criteria);
+
+    return json({ success: true, attendance_id: attendance.id, model: usedModel, analysis, monthly });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await supabase.from('destaque_atendimentos').update({ status: 'erro', error_message: message }).eq('id', attendance.id);
