@@ -1,4 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import { getDocument } from 'npm:pdfjs-dist@4.10.38/legacy/build/pdf.mjs';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -6,29 +7,18 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, 'Content-Type': 'application/json' },
-  });
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+  status,
+  headers: { ...cors, 'Content-Type': 'application/json' },
+});
 
 const extractJson = (text: string) => {
-  const cleaned = text
-    .replace(/^```json\s*/i, '')
-    .replace(/^```\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
-
-  try {
-    return JSON.parse(cleaned);
-  } catch {
+  const cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  try { return JSON.parse(cleaned); } catch {
     const start = cleaned.indexOf('{');
     const end = cleaned.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      return JSON.parse(cleaned.slice(start, end + 1));
-    }
+    if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1));
   }
-
   throw new Error('A IA não retornou um JSON válido.');
 };
 
@@ -39,47 +29,92 @@ const normalizeScore = (value: unknown) => {
   return Math.max(0, Math.min(10, Math.round(n * 10) / 10));
 };
 
-const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  let binary = '';
+const extractPdfText = async (buffer: ArrayBuffer) => {
+  const data = new Uint8Array(buffer);
+  const loadingTask = getDocument({ data, disableWorker: true, useSystemFonts: true, isEvalSupported: false });
+  const pdf = await loadingTask.promise;
+  const pages: string[] = [];
 
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  try {
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => typeof item?.str === 'string' ? item.str : '')
+        .join(' ')
+        .replace(/[ \t]+/g, ' ')
+        .trim();
+      if (pageText) pages.push(`--- PÁGINA ${pageNumber} ---\n${pageText}`);
+    }
+  } finally {
+    await pdf.destroy();
   }
 
-  return btoa(binary);
+  const text = pages.join('\n\n').trim();
+  return { text, pageCount: pages.length, totalPages: pdf.numPages, characters: text.length };
 };
 
-const buildPrompt = (employee: any, criteria: any[]) => {
-  const criteriaText = criteria
-    .map((criterion) => `- ID: ${criterion.id}\n  Critério: ${criterion.name}\n  Regra: ${criterion.description || 'Avalie conforme evidências objetivas do atendimento.'}\n  Nota mínima configurada: ${criterion.min_score}/10\n  Obrigatório: ${criterion.required ? 'sim' : 'não'}`)
-    .join('\n');
+const buildPrompt = (
+  employee: any,
+  criteria: any[],
+  referencesByCriterion: Map<string, any[]>,
+  attendanceText: string,
+) => {
+  const criteriaText = criteria.map((criterion) => {
+    const references = referencesByCriterion.get(criterion.id) || [];
+    const referenceText = references.length
+      ? references.map((reference: any) => `\nBASE DE REFERÊNCIA — ${reference.name} (versão ${reference.version})\n${reference.content}`).join('\n')
+      : '\nBASE DE REFERÊNCIA: nenhuma referência adicional vinculada a este critério.';
+
+    return `- ID: ${criterion.id}\n  Critério: ${criterion.name}\n  Regra: ${criterion.description || 'Avalie conforme evidências objetivas do atendimento.'}\n  Nota mínima configurada: ${criterion.min_score}/10\n  Obrigatório: ${criterion.required ? 'sim' : 'não'}\n${referenceText}`;
+  }).join('\n\n');
 
   return `Você é o avaliador de qualidade do ELO.
 
-Analise EXCLUSIVAMENTE o PDF do atendimento anexado. O PDF contém uma conversa de atendimento ao cliente. Sua função é avaliar o comportamento do atendente humano identificado no documento, usando somente as evidências disponíveis.
+Sua tarefa é avaliar EXCLUSIVAMENTE o atendimento cujo texto foi extraído do PDF abaixo.
 
-COLABORADOR AVALIADO: ${employee?.full_name || 'não informado'}
-SETOR: ${employee?.sector || 'não informado'}
+A avaliação é baseada nos critérios configurados pelo ELO. Quando um critério possuir uma BASE DE REFERÊNCIA, essa base é a referência oficial para interpretar o que deve ser observado naquele critério.
+
+COLABORADOR AVALIADO:
+${employee?.full_name || 'não informado'}
+
+SETOR:
+${employee?.sector || 'não informado'}
 
 CRITÉRIOS ATIVOS COM FONTE IA:
+
 ${criteriaText}
 
-REGRAS OBRIGATÓRIAS:
-1. Avalie somente ações e mensagens atribuíveis ao atendente humano. Não penalize bot, mensagens automáticas, transferências automáticas ou limitações técnicas do sistema como se fossem ações do atendente.
-2. Não invente fatos, intenções, sentimentos, políticas ou informações que não estejam demonstrados no PDF.
-3. Um critério só é avaliável quando houver evidência suficiente no documento. Quando não houver evidência suficiente, use available=false e não informe score.
-4. Quando avaliável, score deve ser de 0 a 10 e pode ter uma casa decimal.
-5. A justificativa deve explicar objetivamente por que a evidência sustenta a nota.
-6. As evidências devem ser curtas, específicas e rastreáveis ao conteúdo do PDF. Quando houver horário relevante, mencione os horários e/ou o intervalo observado.
-7. Pontos de atenção devem registrar fatos ou riscos de processo observáveis. Não transforme automaticamente um ponto de atenção em falha.
-8. Se existir demora entre mensagens, informe o intervalo quando relevante, mas não conclua que houve negligência sem evidência contextual.
-9. Se o atendimento terminar sem confirmação de uma ação esperada, registre isso como ponto de atenção ou resolução incompleta somente quando o PDF sustentar essa leitura.
-10. Não compare o colaborador com outras pessoas.
-11. Não escolha vencedor, destaque do mês ou ranking. O ELO fará os cálculos, pesos e regras de elegibilidade separadamente.
-12. Responda em português do Brasil.
-13. Retorne SOMENTE o JSON solicitado, sem markdown e sem comentários fora do JSON.
+REGRAS GERAIS:
+1. Avalie somente ações e mensagens atribuíveis ao atendente humano.
+2. Não penalize bot, mensagens automáticas, transferências automáticas ou limitações técnicas do sistema como se fossem ações do atendente.
+3. Não invente fatos, intenções, sentimentos, políticas ou informações que não estejam demonstrados no atendimento.
+4. Um critério só é avaliável quando houver evidência suficiente.
+5. Quando não houver evidência suficiente, use available=false e não informe score.
+6. Quando avaliável, score deve ser de 0 a 10 e pode ter uma casa decimal.
+7. A justificativa deve explicar objetivamente por que as evidências sustentam a nota.
+8. As evidências devem ser curtas, específicas e rastreáveis ao texto do atendimento.
+9. Quando houver horário relevante, mencione os horários e/ou o intervalo observado.
+10. Pontos de atenção devem registrar fatos ou riscos de processo observáveis.
+11. Um ponto de atenção não deve ser transformado automaticamente em falha.
+12. Se existir demora entre mensagens, informe o intervalo quando relevante, mas não conclua negligência sem evidência contextual.
+13. Se o atendimento terminar sem confirmação de uma ação esperada, registre isso como ponto de atenção quando o texto sustentar essa leitura.
+14. Não compare o colaborador com outras pessoas.
+15. Não escolha vencedor, destaque do mês ou ranking.
+16. O ELO fará pesos, elegibilidade e resultado final separadamente.
+17. Responda em português do Brasil.
+18. Retorne somente o JSON solicitado.
+19. Não utilize markdown fora do JSON.
+
+REGRAS ESPECÍFICAS PARA O ROTEIRO DE ATENDIMENTO:
+- Quando o critério estiver vinculado ao "Roteiro de Atendimento — System Saúde", use o roteiro como padrão de referência.
+- Avalie aderência ao processo e à intenção de cada etapa, e não apenas correspondência literal das palavras.
+- O atendente pode adaptar a linguagem de forma natural sem ser penalizado por não repetir palavra por palavra.
+- Considere se as etapas aplicáveis ao caso foram cumpridas, na ordem lógica adequada e com clareza.
+- Nem todo atendimento exige todas as 10 etapas; uma etapa deve ser considerada não aplicável quando o contexto do atendimento demonstrar que ela não era necessária.
+- Não penalize a ausência de uma etapa que não poderia ocorrer naquele atendimento.
+- Diferencie falha de execução, etapa não aplicável, evidência insuficiente e simples variação de linguagem.
+- Para a nota, considere também clareza, cordialidade, condução, compreensão da necessidade, resolução e fechamento quando esses aspectos fizerem parte do critério de qualidade.
 
 FORMATO:
 {
@@ -90,37 +125,24 @@ FORMATO:
       "criterion_name": "nome do critério",
       "available": true,
       "score": 8.5,
-      "justification": "justificativa baseada no documento",
+      "justification": "justificativa baseada no documento e na referência vinculada",
       "evidence": ["evidência 1", "evidência 2"],
       "attention_points": ["ponto de atenção 1"]
     }
   ]
 }
 
-Quando available=false, omita o campo score. Não use null no campo score.`;
+Quando available=false, omita o campo score.
+
+TEXTO DO ATENDIMENTO:
+======================
+${attendanceText}
+======================`;
 };
 
-const callGemini = async (
-  model: string,
-  geminiKey: string,
-  prompt: string,
-  base64Pdf: string,
-) => {
+const callGemini = async (model: string, geminiKey: string, prompt: string) => {
   const body = {
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          { text: prompt },
-          {
-            inline_data: {
-              mime_type: 'application/pdf',
-              data: base64Pdf,
-            },
-          },
-        ],
-      },
-    ],
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: {
@@ -140,14 +162,7 @@ const callGemini = async (
                 evidence: { type: 'ARRAY', items: { type: 'STRING' } },
                 attention_points: { type: 'ARRAY', items: { type: 'STRING' } },
               },
-              required: [
-                'criterion_id',
-                'criterion_name',
-                'available',
-                'justification',
-                'evidence',
-                'attention_points',
-              ],
+              required: ['criterion_id', 'criterion_name', 'available', 'justification', 'evidence', 'attention_points'],
             },
           },
         },
@@ -156,20 +171,13 @@ const callGemini = async (
     },
   };
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': geminiKey,
-      },
-      body: JSON.stringify(body),
-    },
-  );
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+    body: JSON.stringify(body),
+  });
 
   const text = await response.text();
-
   if (!response.ok) {
     const compact = text.replace(/\s+/g, ' ').slice(0, 900);
     const error = new Error(`Gemini ${response.status} (${model}): ${compact}`);
@@ -178,24 +186,13 @@ const callGemini = async (
   }
 
   let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(`Gemini retornou uma resposta inválida (${model}).`);
-  }
+  try { data = JSON.parse(text); } catch { throw new Error(`Gemini retornou uma resposta inválida (${model}).`); }
 
-  const finishReason = data?.candidates?.[0]?.finishReason;
-  const output = data?.candidates?.[0]?.content?.parts
-    ?.map((part: any) => part?.text || '')
-    .join('')
-    .trim();
-
+  const output = data?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('').trim();
   if (!output) {
-    throw new Error(
-      `Gemini não retornou conteúdo (${model}).${finishReason ? ` Motivo: ${finishReason}.` : ''}`,
-    );
+    const reason = data?.candidates?.[0]?.finishReason;
+    throw new Error(`Gemini não retornou conteúdo (${model}).${reason ? ` Motivo: ${reason}.` : ''}`);
   }
-
   return extractJson(output);
 };
 
@@ -206,18 +203,12 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const geminiKey = Deno.env.get('GEMINI_API_KEY');
-
-  if (!supabaseUrl || !anonKey || !geminiKey) {
-    return json({ error: 'Secrets obrigatórios não configurados.' }, 500);
-  }
+  if (!supabaseUrl || !anonKey || !geminiKey) return json({ error: 'Secrets obrigatórios não configurados.' }, 500);
 
   const authorization = req.headers.get('Authorization');
   if (!authorization) return json({ error: 'Sessão não encontrada.' }, 401);
 
-  const supabase = createClient(supabaseUrl, anonKey, {
-    global: { headers: { Authorization: authorization } },
-  });
-
+  const supabase = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
   const { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) return json({ error: 'Usuário não autenticado.' }, 401);
 
@@ -228,7 +219,6 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'JSON inválido.' }, 400);
   }
-
   if (!attendanceId) return json({ error: 'attendance_id é obrigatório.' }, 400);
 
   const { data: attendance, error: attendanceError } = await supabase
@@ -236,10 +226,7 @@ Deno.serve(async (req) => {
     .select('id,cycle_id,employee_id,storage_path,file_name,status')
     .eq('id', attendanceId)
     .single();
-
-  if (attendanceError || !attendance) {
-    return json({ error: attendanceError?.message || 'Atendimento não encontrado.' }, 404);
-  }
+  if (attendanceError || !attendance) return json({ error: attendanceError?.message || 'Atendimento não encontrado.' }, 404);
 
   const { data: criteria, error: criteriaError } = await supabase
     .from('destaque_criterios')
@@ -247,7 +234,6 @@ Deno.serve(async (req) => {
     .eq('active', true)
     .eq('source', 'ia')
     .order('created_at', { ascending: true });
-
   if (criteriaError) return json({ error: criteriaError.message }, 500);
   if (!criteria?.length) return json({ error: 'Não há critérios ativos com fonte IA.' }, 400);
 
@@ -256,127 +242,113 @@ Deno.serve(async (req) => {
     .select('id,full_name,sector')
     .eq('id', attendance.employee_id)
     .maybeSingle();
+  if (employeeError || !employee) return json({ error: 'Colaborador vinculado ao atendimento não foi encontrado.' }, 400);
 
-  if (employeeError || !employee) {
-    return json({ error: 'Colaborador vinculado ao atendimento não foi encontrado.' }, 400);
+  // Carrega a base oficial de conhecimento vinculada a cada critério.
+  const criterionIds = criteria.map((c: any) => c.id);
+  const { data: links, error: linksError } = await supabase
+    .from('destaque_criterio_referencias')
+    .select('criterion_id,reference_id,priority')
+    .in('criterion_id', criterionIds)
+    .order('priority', { ascending: true });
+  if (linksError) return json({ error: `Falha ao carregar referências da IA: ${linksError.message}` }, 500);
+
+  const referenceIds = [...new Set((links || []).map((x: any) => x.reference_id))];
+  let references: any[] = [];
+  if (referenceIds.length) {
+    const { data, error } = await supabase
+      .from('destaque_referencias_ia')
+      .select('id,slug,name,reference_type,version,content,active')
+      .in('id', referenceIds)
+      .eq('active', true);
+    if (error) return json({ error: `Falha ao carregar base da IA: ${error.message}` }, 500);
+    references = data || [];
   }
 
-  await supabase
-    .from('destaque_atendimentos')
-    .update({ status: 'analisando', error_message: null })
-    .eq('id', attendance.id);
+  const referencesMap = new Map(references.map((r: any) => [r.id, r]));
+  const referencesByCriterion = new Map<string, any[]>();
+  for (const link of (links || [])) {
+    const ref = referencesMap.get(link.reference_id);
+    if (!ref) continue;
+    const list = referencesByCriterion.get(link.criterion_id) || [];
+    list.push(ref);
+    referencesByCriterion.set(link.criterion_id, list);
+  }
+
+  await supabase.from('destaque_atendimentos').update({ status: 'analisando', error_message: null }).eq('id', attendance.id);
 
   try {
-    const { data: pdf, error: downloadError } = await supabase.storage
-      .from('destaque-atendimentos')
-      .download(attendance.storage_path);
-
-    if (downloadError || !pdf) {
-      throw new Error(downloadError?.message || 'Não foi possível baixar o PDF do Storage.');
-    }
+    const { data: pdf, error: downloadError } = await supabase.storage.from('destaque-atendimentos').download(attendance.storage_path);
+    if (downloadError || !pdf) throw new Error(downloadError?.message || 'Não foi possível baixar o PDF do Storage.');
 
     const pdfBytes = await pdf.arrayBuffer();
+    const maxBytes = 20 * 1024 * 1024;
+    if (pdfBytes.byteLength > maxBytes) throw new Error('PDF muito grande. Envie um arquivo de até 20 MB.');
 
-    // Inline PDF é adequado para documentos menores/processamento temporário.
-    // Para arquivos muito grandes, o Files API deve ser usado.
-    const maxInlineBytes = 20 * 1024 * 1024;
-    if (pdfBytes.byteLength > maxInlineBytes) {
-      throw new Error('PDF muito grande para análise inline. Envie um arquivo de até 20 MB.');
+    const extraction = await extractPdfText(pdfBytes);
+    if (!extraction.text || extraction.characters < 80) {
+      throw new Error('Este PDF não possui texto selecionável suficiente para análise automática. O próximo passo é habilitar OCR para PDFs escaneados ou baseados em imagem.');
     }
 
-    const base64Pdf = arrayBufferToBase64(pdfBytes);
-    const prompt = buildPrompt(employee, criteria);
-
+    const prompt = buildPrompt(employee, criteria, referencesByCriterion, extraction.text);
     let parsed: any;
     let usedModel = 'gemini-3.6-flash';
     const errors: string[] = [];
 
     try {
-      parsed = await callGemini('gemini-3.6-flash', geminiKey, prompt, base64Pdf);
+      parsed = await callGemini('gemini-3.6-flash', geminiKey, prompt);
     } catch (error) {
       const status = Number((error as any)?.status || 0);
       const message = error instanceof Error ? error.message : String(error);
       errors.push(message);
-
-      // Fallback somente para indisponibilidade temporária/limitação de capacidade.
-      if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) {
+      if ([429, 500, 502, 503, 504].includes(status)) {
         usedModel = 'gemini-3.5-flash-lite';
-        try {
-          parsed = await callGemini('gemini-3.5-flash-lite', geminiKey, prompt, base64Pdf);
-        } catch (fallbackError) {
-          errors.push(fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
-        }
+        try { parsed = await callGemini(usedModel, geminiKey, prompt); }
+        catch (fallbackError) { errors.push(fallbackError instanceof Error ? fallbackError.message : String(fallbackError)); }
       }
-
-      if (!parsed) {
-        throw new Error(`Não foi possível realizar a análise com os modelos Gemini configurados. ${errors.join(' | ')}`);
-      }
+      if (!parsed) throw new Error(`Não foi possível realizar a análise com os modelos Gemini configurados. ${errors.join(' | ')}`);
     }
 
     const returned = Array.isArray(parsed?.criterios) ? parsed.criterios : [];
-
-    const normalized = criteria.map((criterion) => {
-      const item = returned.find(
-        (candidate: any) =>
-          candidate?.criterion_id === criterion.id || candidate?.criterion_name === criterion.name,
-      );
-
-      const normalizedScore = normalizeScore(item?.score);
-      const available = item?.available === true && normalizedScore !== null;
-
+    const normalized = criteria.map((criterion: any) => {
+      const item = returned.find((candidate: any) => candidate?.criterion_id === criterion.id || candidate?.criterion_name === criterion.name);
+      const score = normalizeScore(item?.score);
+      const available = item?.available === true && score !== null;
+      const refs = referencesByCriterion.get(criterion.id) || [];
       return {
         criterion_id: criterion.id,
         criterion_name: criterion.name,
         available,
-        score: available ? normalizedScore : null,
-        justification:
-          typeof item?.justification === 'string' && item.justification.trim()
-            ? item.justification.trim()
-            : 'Não houve evidência suficiente no PDF para avaliar este critério.',
+        score: available ? score : null,
+        justification: typeof item?.justification === 'string' && item.justification.trim() ? item.justification.trim() : 'Não houve evidência suficiente no atendimento para avaliar este critério.',
         evidence: Array.isArray(item?.evidence) ? item.evidence.slice(0, 8) : [],
-        attention_points: Array.isArray(item?.attention_points)
-          ? item.attention_points.slice(0, 8)
-          : [],
+        attention_points: Array.isArray(item?.attention_points) ? item.attention_points.slice(0, 8) : [],
+        references_used: refs.map((r: any) => ({ id: r.id, name: r.name, version: r.version })),
       };
     });
 
     const analyzedAt = new Date().toISOString();
     const analysis = {
-      resumo:
-        typeof parsed?.resumo === 'string' && parsed.resumo.trim()
-          ? parsed.resumo.trim()
-          : 'Análise concluída.',
+      resumo: typeof parsed?.resumo === 'string' && parsed.resumo.trim() ? parsed.resumo.trim() : 'Análise concluída.',
       criterios: normalized,
       analyzed_by: usedModel,
       analyzed_at: analyzedAt,
+      extraction: {
+        method: 'pdf-text',
+        total_pages: extraction.totalPages,
+        pages_with_text: extraction.pageCount,
+        characters: extraction.characters,
+      },
+      references: references.map((r: any) => ({ id: r.id, name: r.name, type: r.reference_type, version: r.version })),
     };
 
-    const { error: saveError } = await supabase
-      .from('destaque_atendimentos')
-      .update({
-        status: 'analisado',
-        analysis,
-        analyzed_at: analyzedAt,
-        error_message: null,
-      })
-      .eq('id', attendance.id);
-
+    const { error: saveError } = await supabase.from('destaque_atendimentos').update({ status: 'analisado', analysis, analyzed_at: analyzedAt, error_message: null }).eq('id', attendance.id);
     if (saveError) throw new Error(`Falha ao salvar análise: ${saveError.message}`);
 
-    return json({
-      success: true,
-      attendance_id: attendance.id,
-      model: usedModel,
-      analysis,
-    });
+    return json({ success: true, attendance_id: attendance.id, model: usedModel, analysis });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-
-    await supabase
-      .from('destaque_atendimentos')
-      .update({ status: 'erro', error_message: message })
-      .eq('id', attendance.id);
-
+    await supabase.from('destaque_atendimentos').update({ status: 'erro', error_message: message }).eq('id', attendance.id);
     return json({ success: false, error: message, attendance_id: attendance.id }, 500);
   }
 });

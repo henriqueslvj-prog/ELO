@@ -1,109 +1,106 @@
-# ELO — Gestão, Organização, Resultados
+# ELO V0.10 — Motor de Avaliação com Base de Referência
 
-Fundação do sistema privado ELO, com autenticação via Supabase.
+## Nova arquitetura
 
-## Configuração local
+O módulo de Destaque do Mês passa a trabalhar em quatro camadas:
 
-1. Copie `.env.example` para `.env`.
-2. Preencha:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-3. Execute `npm install`.
-4. Execute `npm run dev`.
+```text
+PDF do atendimento
+      ↓
+Extração de texto (PDF.js)
+      ↓
+Texto da conversa
+      ↓
+IA (Gemini)
+      ↓
+Critérios + referências oficiais vinculadas
+      ↓
+Notas + evidências + pontos de atenção
+      ↓
+Motor do ELO
+      ↓
+Peso / elegibilidade / resultado
+```
 
-## Supabase
+A IA não escolhe o Destaque do Mês e não compara colaboradores.
 
-O `supabase/schema.sql` cria a tabela `profiles`, RLS, função de administrador e trigger de perfil.
+## Base oficial do atendimento
 
-Para criar o primeiro acesso:
-- Supabase → Authentication → Users → Add user.
-- Confirme o usuário.
-- No SQL Editor, altere o `role` para `administrador` e `status` para `ativo`.
+Foi criada a tabela `public.destaque_referencias_ia` para armazenar materiais oficiais usados como base de avaliação.
 
-A tela de login não possui cadastro público. O frontend valida também se existe um perfil ativo para o usuário autenticado.
+Também foi criada `public.destaque_criterio_referencias`, que permite vincular uma ou mais referências a cada critério.
 
-## Criação interna de usuários
+O roteiro fornecido pela System Saúde foi cadastrado como:
 
-A função `supabase/functions/admin-create-user/index.ts` deve ser publicada como Edge Function `admin-create-user` e receber `SUPABASE_SERVICE_ROLE_KEY` como secret. A Service Role Key nunca deve ser colocada no frontend.
+- `Roteiro de Atendimento — System Saúde`
+- versão `1.0`
+- tipo `script_atendimento`
+- slug `system-saude-roteiro-atendimento`
 
+O SQL tenta vinculá-lo automaticamente ao critério:
 
-## Solicitações V0.7
-Execute `supabase/solicitacoes.sql` depois da fundação e do módulo Demandas. A interface já está integrada ao frontend e grava no Supabase.
+`Qualidade do Atendimento`
 
-## ELO V0.8 — Motor de Avaliação / Destaque do Mês
+## Como a IA avaliará o roteiro
 
-### 1. Banco de dados
-Execute no Supabase:
-`supabase/destaques.sql`
+Para o critério vinculado ao roteiro, a IA receberá:
 
-Esse script cria os ciclos de avaliação, critérios, avaliações, itens, atendimentos e o bucket privado para PDFs.
+1. a regra do critério;
+2. o roteiro oficial;
+3. o texto extraído do atendimento.
 
-### 2. Permissões
-O módulo usa o módulo `destaques` do sistema de permissões. Para o administrador, conceda ao menos `view/create/edit`; para análise e manutenção completa, `delete` também.
+Ela deverá avaliar aderência ao processo e à intenção das etapas, sem exigir repetição literal das frases.
 
-### 3. IA para análise de PDF
-A versão inclui a Edge Function:
-`supabase/functions/analyze-attendance/index.ts`
+Etapas não aplicáveis ao caso não devem ser penalizadas.
 
-Ela usa a Gemini API no servidor. Configure o secret da função:
-`GEMINI_API_KEY`
+A IA também diferencia:
 
-A chave não deve ser colocada no frontend/Vercel como variável pública.
+- falha de execução;
+- etapa não aplicável;
+- evidência insuficiente;
+- variação natural de linguagem.
 
-Depois faça o deploy da função `analyze-attendance` pelo Supabase CLI/dashboard.
+## Banco de dados
 
-O fluxo é:
-PDF → Storage privado → Edge Function → Gemini → JSON estruturado → `destaque_atendimentos.analysis`.
+Execute no Supabase SQL Editor, nesta ordem:
 
-### 4. Modelo utilizado
-A função está preparada para `gemini-2.5-flash`. A disponibilidade de nível sem custo e os limites de uso devem ser conferidos na documentação atual do Google antes de colocar a rotina em produção.
+1. `supabase/destaques.sql` — caso ainda não tenha sido executado.
+2. `supabase/destaques-fix.sql` — caso sua base utilize a correção de integridade da equipe avaliada.
+3. `supabase/destaques-referencias.sql` — NOVA ARQUITETURA V0.10.
 
-## V0.8.1 — Gemini / análise de atendimentos
-- A Edge Function `analyze-attendance` usa `GEMINI_API_KEY` somente no servidor.
-- O PDF é enviado ao Gemini e avaliado exclusivamente contra os critérios ativos com fonte `ia`.
-- A resposta é estruturada em JSON com nota, disponibilidade, justificativa, evidências e pontos de atenção.
-- Critérios sem evidência suficiente retornam `available=false` e `score=null`.
-- A interface do ELO exibe o histórico e o resultado detalhado da análise.
-
-### Deploy da Edge Function
-Após configurar o secret `GEMINI_API_KEY` no Supabase, publique a função `analyze-attendance` pelo método de deploy de Edge Functions que você já utiliza no projeto.
-
-## V0.8.2 — Equipe avaliada
-O módulo Destaque do Mês agora possui a aba **Equipe**, com cadastro independente dos usuários do ELO. Execute o bloco adicional ao final de `supabase/destaques.sql` no SQL Editor do Supabase antes de testar o cadastro de colaboradores.
+Se o critério `Qualidade do Atendimento` já existir, o terceiro SQL fará o vínculo automaticamente.
 
 ## Edge Function
-A função `supabase/functions/analyze-attendance/index.ts` recebe `attendance_id`, baixa o PDF pelo Storage autenticado e chama o Gemini para preencher os critérios de fonte IA. Configure `GEMINI_API_KEY` como Secret da Edge Function e faça o deploy de `analyze-attendance`.
 
-## V0.8.4 — Gemini 3.6 / PDF inline / correção de API
+Arquivo:
 
-A Edge Function `analyze-attendance` foi atualizada para a API atual do Gemini:
+`supabase/functions/analyze-attendance/index.ts`
 
-- modelo principal: `gemini-3.6-flash`;
-- fallback temporário: `gemini-3.5-flash-lite` somente em erros de disponibilidade/capacidade;
-- autenticação pelo header `x-goog-api-key`;
-- PDF enviado como `inline_data` em `generateContent`;
-- remoção do parâmetro `temperature`, que não deve ser usado nos modelos Gemini 3.6+;
-- resposta JSON estruturada;
-- critérios sem evidência suficiente permanecem `available=false` e sem nota;
-- a IA não calcula vencedor nem ranking; o ELO continua responsável pelos pesos e elegibilidade.
+Ela agora:
 
-O fluxo agora é:
-`PDF → Storage privado → Edge Function → Gemini 3.6 Flash → JSON → ELO`.
+- baixa o PDF do Storage privado;
+- extrai texto com PDF.js;
+- não envia o PDF para o Gemini;
+- carrega as referências vinculadas aos critérios;
+- envia texto + critérios + referências ao Gemini;
+- salva método de extração e referências utilizadas na análise.
 
-Para publicar:
+Deploy:
 
 ```bash
 supabase functions deploy analyze-attendance
 ```
 
-Secret obrigatório da função:
-`GEMINI_API_KEY`
+Secret necessário:
 
-A chave deve permanecer somente nos Secrets da Edge Function. Não coloque a chave no frontend/Vercel.
+```text
+GEMINI_API_KEY
+```
 
-A documentação atual do Google confirma o uso de `gemini-3.6-flash`, `x-goog-api-key`, `generateContent` e PDF inline para esse fluxo.
+## Interface
 
-## V0.8.3 — Correção do fluxo de análise
-A tela de análise agora valida novamente o colaborador diretamente em `destaque_colaboradores` antes de criar `destaque_atendimentos`. Isso evita usar um ID antigo do estado do navegador e garante que `employee_id` seja o ID do cadastro da equipe avaliada.
+Foi adicionada a aba `Base da IA` dentro de `Destaques` para visualizar as referências cadastradas e o roteiro oficial utilizado pela avaliação.
 
-Também foi incluído `supabase/destaques-fix.sql`, uma migração segura para garantir que as foreign keys de `destaque_atendimentos` e `destaque_avaliacoes` apontem para `destaque_colaboradores(id)`.
+## Próxima evolução prevista
+
+Se houver PDF sem camada de texto, o ELO poderá encaminhar o arquivo para uma segunda etapa de OCR, mantendo o mesmo motor de avaliação. Isso evita alterar a lógica dos critérios quando a origem do texto mudar.
