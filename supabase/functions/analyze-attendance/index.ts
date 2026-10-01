@@ -141,6 +141,79 @@ ${attendanceText}
 };
 
 
+const detectAttendanceDate = (text: string) => {
+  const candidates = text.match(/\b(0?[1-9]|[12]\d|3[01])[\/-](0?[1-9]|1[0-2])[\/-](20\d{2})\b/g) || [];
+
+  for (const raw of candidates) {
+    const normalized = raw.replace(/\//g, '-');
+    const [dayRaw, monthRaw, yearRaw] = normalized.split('-');
+    const day = Number(dayRaw);
+    const month = Number(monthRaw);
+    const year = Number(yearRaw);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    ) {
+      return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    }
+  }
+
+  return null;
+};
+
+const ensureCycleForPeriod = async (supabase: any, periodKey: string, userId: string) => {
+  const [yearRaw, monthRaw] = periodKey.split('-');
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const end = new Date(Date.UTC(year, month, 0));
+  const periodStart = start.toISOString().slice(0, 10);
+  const periodEnd = end.toISOString().slice(0, 10);
+
+  const { data: existing, error: existingError } = await supabase
+    .from('destaque_ciclos')
+    .select('*')
+    .eq('period_key', periodKey)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(`Não foi possível localizar o ciclo de ${periodKey}: ${existingError.message}`);
+  }
+
+  if (existing) return existing;
+
+  const { data: created, error: createError } = await supabase
+    .from('destaque_ciclos')
+    .insert({
+      period_key: periodKey,
+      period_start: periodStart,
+      period_end: periodEnd,
+      team_name: 'Equipe',
+      status: 'em_avaliacao',
+      created_by: userId,
+    })
+    .select()
+    .single();
+
+  if (createError) {
+    // Outro processo pode ter criado o mesmo ciclo simultaneamente.
+    if (createError.code === '23505') {
+      const { data: retry, error: retryError } = await supabase
+        .from('destaque_ciclos')
+        .select('*')
+        .eq('period_key', periodKey)
+        .single();
+      if (!retryError && retry) return retry;
+    }
+    throw new Error(`Não foi possível criar o ciclo ${periodKey}: ${createError.message}`);
+  }
+
+  return created;
+};
+
 const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any[]) => {
   const { data: evaluation, error: evaluationError } = await supabase
     .from('destaque_avaliacoes')
@@ -353,6 +426,31 @@ Deno.serve(async (req) => {
       throw new Error('Este PDF não possui texto selecionável suficiente para análise automática. O próximo passo é habilitar OCR para PDFs escaneados ou baseados em imagem.');
     }
 
+    const attendanceDate = detectAttendanceDate(extraction.text);
+    if (!attendanceDate) {
+      throw new Error('Não foi possível identificar a data do atendimento no PDF. Verifique se o documento contém a data no formato DD/MM/AAAA.');
+    }
+
+    const periodKey = attendanceDate.slice(0, 7);
+    const targetCycle = await ensureCycleForPeriod(supabase, periodKey, userData.user.id);
+
+    const { error: attendancePeriodError } = await supabase
+      .from('destaque_atendimentos')
+      .update({
+        cycle_id: targetCycle.id,
+        attendance_date: attendanceDate,
+        period_key: periodKey,
+      })
+      .eq('id', attendance.id);
+
+    if (attendancePeriodError) {
+      throw new Error(`Não foi possível vincular o atendimento ao período ${periodKey}: ${attendancePeriodError.message}`);
+    }
+
+    attendance.cycle_id = targetCycle.id;
+    attendance.attendance_date = attendanceDate;
+    attendance.period_key = periodKey;
+
     const prompt = buildPrompt(employee, criteria, referencesByCriterion, extraction.text);
     let parsed: any;
     let usedModel = 'gemini-3.6-flash';
@@ -410,7 +508,23 @@ Deno.serve(async (req) => {
 
     const monthly = await syncMonthlyAiScores(supabase, attendance, criteria);
 
-    return json({ success: true, attendance_id: attendance.id, model: usedModel, analysis, monthly });
+    const { data: consolidatedEvaluation, error: consolidationError } = await supabase
+      .rpc('recalculate_destaque_evaluation', { p_evaluation_id: monthly.evaluation_id });
+
+    if (consolidationError) {
+      throw new Error(`A análise foi salva, mas não foi possível consolidar a pontuação mensal: ${consolidationError.message}`);
+    }
+
+    return json({
+      success: true,
+      attendance_id: attendance.id,
+      model: usedModel,
+      attendance_date: attendanceDate,
+      period_key: periodKey,
+      analysis,
+      monthly,
+      evaluation: consolidatedEvaluation,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await supabase.from('destaque_atendimentos').update({ status: 'erro', error_message: message }).eq('id', attendance.id);
