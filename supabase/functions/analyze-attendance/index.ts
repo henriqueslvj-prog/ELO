@@ -26,7 +26,7 @@ const normalizeScore = (value: unknown) => {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(10, Math.round(n * 10) / 10));
+  return Math.max(0, Math.min(3, Math.round(n * 10) / 10));
 };
 
 const extractPdfText = async (buffer: ArrayBuffer) => {
@@ -66,80 +66,83 @@ const buildPrompt = (
       ? references.map((reference: any) => `\nBASE DE REFERÊNCIA — ${reference.name} (versão ${reference.version})\n${reference.content}`).join('\n')
       : '\nBASE DE REFERÊNCIA: nenhuma referência adicional vinculada a este critério.';
 
-    return `- ID: ${criterion.id}\n  Critério: ${criterion.name}\n  Regra: ${criterion.description || 'Avalie conforme evidências objetivas do atendimento.'}\n  Nota mínima configurada: ${criterion.min_score}/10\n  Obrigatório: ${criterion.required ? 'sim' : 'não'}\n${referenceText}`;
+    return `- ID: ${criterion.id}\n  Critério: ${criterion.name}\n  Regra: ${criterion.description || 'Avalie conforme evidências objetivas do atendimento.'}\n  Peso: ${criterion.weight}%\n  Nota mínima configurada: ${criterion.min_score}/3\n  Obrigatório: ${criterion.required ? 'sim' : 'não'}\n${referenceText}`;
   }).join('\n\n');
 
-  return `Você é o avaliador de qualidade do ELO.
+  return `Você é um ESPECIALISTA SÊNIOR EM QUALIDADE DE ATENDIMENTO, auditor de atendimento humano e avaliador técnico do ELO.
 
-Sua tarefa é avaliar EXCLUSIVAMENTE o atendimento cujo texto foi extraído do PDF abaixo.
+Sua responsabilidade é analisar o atendimento de forma rigorosa, justa e baseada em evidências. Você não é um gerador de elogios e não deve presumir que o atendimento foi bom. Também não deve penalizar o atendente por fatores que não estejam sob seu controle.
 
-A avaliação é baseada nos critérios configurados pelo ELO. Quando um critério possuir uma BASE DE REFERÊNCIA, essa base é a referência oficial para interpretar o que deve ser observado naquele critério.
+ATENDIMENTO AVALIADO
+Colaborador: ${employee?.full_name || 'não informado'}
+Setor: ${employee?.sector || 'não informado'}
 
-COLABORADOR AVALIADO:
-${employee?.full_name || 'não informado'}
-
-SETOR:
-${employee?.sector || 'não informado'}
-
-CRITÉRIOS ATIVOS COM FONTE IA:
-
+CRITÉRIOS ATIVOS
 ${criteriaText}
 
-REGRAS GERAIS:
-1. Avalie somente ações e mensagens atribuíveis ao atendente humano.
-2. Não penalize bot, mensagens automáticas, transferências automáticas ou limitações técnicas do sistema como se fossem ações do atendente.
-3. Não invente fatos, intenções, sentimentos, políticas ou informações que não estejam demonstrados no atendimento.
-4. Um critério só é avaliável quando houver evidência suficiente.
-5. Quando não houver evidência suficiente, use available=false e não informe score.
-6. Quando avaliável, score deve ser de 0 a 10 e pode ter uma casa decimal.
-7. A justificativa deve explicar objetivamente por que as evidências sustentam a nota.
-8. As evidências devem ser curtas, específicas e rastreáveis ao texto do atendimento.
-9. Quando houver horário relevante, mencione os horários e/ou o intervalo observado.
-10. Pontos de atenção devem registrar fatos ou riscos de processo observáveis.
-11. Um ponto de atenção não deve ser transformado automaticamente em falha.
-12. Se existir demora entre mensagens, informe o intervalo quando relevante, mas não conclua negligência sem evidência contextual.
-13. Se o atendimento terminar sem confirmação de uma ação esperada, registre isso como ponto de atenção quando o texto sustentar essa leitura.
-14. Não compare o colaborador com outras pessoas.
-15. Não escolha vencedor, destaque do mês ou ranking.
-16. O ELO fará pesos, elegibilidade e resultado final separadamente.
-17. Responda em português do Brasil.
-18. Retorne somente o JSON solicitado.
-19. Não utilize markdown fora do JSON.
+O QUE VOCÊ DEVE ANALISAR
+1. Se o cliente foi efetivamente acolhido e tratado com cordialidade e respeito.
+2. Se o cliente recebeu resposta em tempo razoável, considerando os horários registrados e o contexto do atendimento.
+3. Se as respostas foram claras, objetivas, completas e compreensíveis.
+4. Se a solicitação do cliente foi resolvida, parcialmente resolvida, ficou pendente ou não foi possível concluir.
+5. Se o atendente conduziu o atendimento com profissionalismo, domínio do processo, organização e fechamento adequado.
 
-REGRAS ESPECÍFICAS PARA O ROTEIRO DE ATENDIMENTO:
-- Quando o critério estiver vinculado ao "Roteiro de Atendimento — System Saúde", use o roteiro como padrão de referência.
-- Avalie aderência ao processo e à intenção de cada etapa, e não apenas correspondência literal das palavras.
-- O atendente pode adaptar a linguagem de forma natural sem ser penalizado por não repetir palavra por palavra.
-- Considere se as etapas aplicáveis ao caso foram cumpridas, na ordem lógica adequada e com clareza.
-- Nem todo atendimento exige todas as 10 etapas; uma etapa deve ser considerada não aplicável quando o contexto do atendimento demonstrar que ela não era necessária.
-- Não penalize a ausência de uma etapa que não poderia ocorrer naquele atendimento.
-- Diferencie falha de execução, etapa não aplicável, evidência insuficiente e simples variação de linguagem.
-- Para a nota, considere também clareza, cordialidade, condução, compreensão da necessidade, resolução e fechamento quando esses aspectos fizerem parte do critério de qualidade.
+ESCALA OBRIGATÓRIA POR CRITÉRIO — 0 A 3 PONTOS
+- 3.0 = excelência: comportamento claramente demonstrado e consistente, sem falha relevante.
+- 2.0 = adequado: atende ao esperado, com pequena oportunidade de melhoria.
+- 1.0 = insuficiente: falha relevante ou execução apenas parcial.
+- 0.0 = inadequado: falha grave, ausência injustificada ou condução incompatível com o padrão.
+Você pode usar décimos entre esses níveis (ex.: 2.4, 2.7), mas nunca ultrapasse 3.0.
 
-FORMATO:
+REGRAS DE AUDITORIA
+- Analise somente ações e mensagens atribuíveis ao atendente humano.
+- Não penalize bot, mensagens automáticas, filas, transferências automáticas ou limitações técnicas como se fossem ações do atendente.
+- Reconstrua a linha do tempo quando houver horários. Diferencie tempo de espera do cliente, tempo de resposta do atendente e períodos fora do horário de atendimento.
+- Uma demora deve ser registrada como fato com intervalo observado. Não chame de negligência sem evidência contextual.
+- Ser objetivo ou breve não significa ser grosseiro. Só classifique como seco, ríspido, frio ou inadequadamente cordial quando o texto sustentar essa interpretação.
+- Não confunda cordialidade com excesso de emojis ou frases prontas.
+- Verifique se o atendente entendeu a necessidade do cliente e respondeu exatamente ao que foi solicitado.
+- Verifique se a resposta realmente resolve a solicitação ou apenas fornece informação parcial.
+- Se o cliente indicar uma intenção clara (por exemplo, escolher data, modalidade ou pagamento) e não houver confirmação/conclusão no documento, registre a pendência como ponto de atenção.
+- Não invente agendamento, confirmação, intenção, sentimento, regra, política ou informação ausente.
+- Diferencie: resolvida, parcialmente_resolvida, não_resolvida e não_foi_possivel_concluir.
+- Não penalize uma etapa que não era aplicável ao caso.
+- Use o Roteiro de Atendimento — System Saúde como referência de processo quando estiver vinculado ao critério. Avalie o significado e a etapa, não a correspondência literal das palavras.
+- Não compare este colaborador com outras pessoas.
+- Não escolha vencedor, destaque do mês ou ranking. O ELO fará a consolidação.
+- Se não houver evidência suficiente para um critério, use available=false e não invente uma nota.
+- Responda em português do Brasil.
+- Retorne somente JSON válido.
+
+FORMATO OBRIGATÓRIO
 {
-  "resumo": "resumo objetivo do atendimento",
+  "resumo": "parecer técnico curto e objetivo",
+  "solicitacao_cliente": "o que o cliente buscava resolver",
+  "status_resolucao": "resolvida | parcialmente_resolvida | não_resolvida | não_foi_possivel_concluir",
+  "tempo_resposta": {
+    "primeira_resposta_minutos": null,
+    "maior_intervalo_relevante_minutos": null,
+    "observacao": "fato objetivo sobre tempo e contexto"
+  },
+  "parecer_especialista": "conclusão técnica sobre a qualidade do atendimento, sem escolher vencedor",
   "criterios": [
     {
       "criterion_id": "ID do critério",
       "criterion_name": "nome do critério",
       "available": true,
-      "score": 8.5,
-      "justification": "justificativa baseada no documento e na referência vinculada",
-      "evidence": ["evidência 1", "evidência 2"],
-      "attention_points": ["ponto de atenção 1"]
+      "score": 2.5,
+      "justification": "justificativa técnica baseada em fatos",
+      "evidence": ["evidência curta e rastreável"],
+      "attention_points": ["ponto de atenção objetivo"]
     }
   ]
 }
 
-Quando available=false, omita o campo score.
-
-TEXTO DO ATENDIMENTO:
+TEXTO EXTRAÍDO DO PDF
 ======================
 ${attendanceText}
 ======================`;
 };
-
 
 const detectAttendanceDate = (text: string) => {
   const candidates = text.match(/\b(0?[1-9]|[12]\d|3[01])[\/-](0?[1-9]|1[0-2])[\/-](20\d{2})\b/g) || [];
@@ -232,14 +235,13 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
 
   const { data: analyzedAttendances, error: attendanceError } = await supabase
     .from('destaque_atendimentos')
-    .select('id,analysis,status')
+    .select('id,analysis,status,attendance_date,period_key')
     .eq('cycle_id', attendance.cycle_id)
     .eq('employee_id', attendance.employee_id)
-    .eq('status', 'analisado');
+    .eq('status', 'analisado')
+    .eq('period_key', attendance.period_key);
 
-  if (attendanceError) {
-    throw new Error(`Não foi possível consolidar os atendimentos do mês: ${attendanceError.message}`);
-  }
+  if (attendanceError) throw new Error(`Não foi possível consolidar os atendimentos do mês: ${attendanceError.message}`);
 
   for (const criterion of criteria) {
     const values: number[] = [];
@@ -251,10 +253,16 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
       if (criterionResult?.available === true && score !== null) values.push(score);
     }
 
-    if (!values.length) continue;
+    if (!values.length) {
+      await supabase
+        .from('destaque_avaliacao_itens')
+        .delete()
+        .eq('evaluation_id', evaluation.id)
+        .eq('criterion_id', criterion.id);
+      continue;
+    }
 
     const average = Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
-
     const { error: itemError } = await supabase
       .from('destaque_avaliacao_itens')
       .upsert({
@@ -285,6 +293,18 @@ const callGemini = async (model: string, geminiKey: string, prompt: string) => {
         type: 'OBJECT',
         properties: {
           resumo: { type: 'STRING' },
+          solicitacao_cliente: { type: 'STRING' },
+          status_resolucao: { type: 'STRING' },
+          tempo_resposta: {
+            type: 'OBJECT',
+            properties: {
+              primeira_resposta_minutos: { type: 'NUMBER' },
+              maior_intervalo_relevante_minutos: { type: 'NUMBER' },
+              observacao: { type: 'STRING' },
+            },
+            required: ['observacao'],
+          },
+          parecer_especialista: { type: 'STRING' },
           criterios: {
             type: 'ARRAY',
             items: {
@@ -302,7 +322,7 @@ const callGemini = async (model: string, geminiKey: string, prompt: string) => {
             },
           },
         },
-        required: ['resumo', 'criterios'],
+        required: ['resumo', 'solicitacao_cliente', 'status_resolucao', 'tempo_resposta', 'parecer_especialista', 'criterios'],
       },
     },
   };
@@ -359,8 +379,9 @@ Deno.serve(async (req) => {
 
   const { data: attendance, error: attendanceError } = await supabase
     .from('destaque_atendimentos')
-    .select('id,cycle_id,employee_id,storage_path,file_name,status')
+    .select('id,cycle_id,employee_id,storage_path,file_name,status,evaluation_deleted_at')
     .eq('id', attendanceId)
+    .is('evaluation_deleted_at', null)
     .single();
   if (attendanceError || !attendance) return json({ error: attendanceError?.message || 'Atendimento não encontrado.' }, 404);
 
@@ -491,6 +512,11 @@ Deno.serve(async (req) => {
     const analyzedAt = new Date().toISOString();
     const analysis = {
       resumo: typeof parsed?.resumo === 'string' && parsed.resumo.trim() ? parsed.resumo.trim() : 'Análise concluída.',
+      solicitacao_cliente: typeof parsed?.solicitacao_cliente === 'string' ? parsed.solicitacao_cliente.trim() : '',
+      status_resolucao: typeof parsed?.status_resolucao === 'string' ? parsed.status_resolucao : 'não_foi_possivel_concluir',
+      tempo_resposta: parsed?.tempo_resposta || null,
+      parecer_especialista: typeof parsed?.parecer_especialista === 'string' ? parsed.parecer_especialista.trim() : '',
+      nota_total: normalized.every((x: any) => x.available && x.score !== null) ? (() => { const totalWeight = criteria.reduce((sum: number, c: any) => sum + Number(c.weight || 0), 0); const weighted = normalized.reduce((sum: number, x: any) => { const c = criteria.find((item: any) => item.id === x.criterion_id); return sum + (Number(x.score || 0) * Number(c?.weight || 0)); }, 0); return totalWeight > 0 ? Math.round(((weighted / totalWeight) * 5) * 10) / 10 : null; })() : null,
       criterios: normalized,
       analyzed_by: usedModel,
       analyzed_at: analyzedAt,

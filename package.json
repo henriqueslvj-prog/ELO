@@ -1,9 +1,1 @@
-{
-  "name":"elo-gestao",
-  "private":true,
-  "version":"0.12.0",
-  "type":"module",
-  "scripts":{"dev":"vite","build":"vite build","preview":"vite preview"},
-  "dependencies":{"@supabase/supabase-js":"latest","@vitejs/plugin-react":"latest","vite":"latest","react":"latest","react-dom":"latest"},
-  "devDependencies":{}
-}
+{"name":"elo-gestao","private":true,"version":"0.13.0","type":"module","scripts":{"dev":"vite","build":"vite build","preview":"vite preview"},"dependencies":{"@supabase/supabase-js":"latest","@vitejs/plugin-react":"latest","vite":"latest","react":"latest","react-dom":"latest"},"devDependencies":{}}
