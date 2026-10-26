@@ -114,8 +114,26 @@ REGRAS DE AUDITORIA
 - Responda em português do Brasil.
 - Retorne somente JSON válido.
 
+REGRA OFICIAL DE PONTUAÇÃO DA SYSTEM SAÚDE
+A) QUALIDADE DO ATENDIMENTO: atribua uma nota geral inteira de 0 a 100 para ESTE atendimento, considerando acolhimento, tempo de resposta, clareza, resolução e profissionalismo. A nota mensal desta categoria será calculada pelo ELO como a média de até 10 atendimentos aleatórios e convertida para 15 pontos: média × 0,15, arredondada para inteiro. Não converta a nota individual em 15 pontos.
+B) UTILIZAÇÃO DO SCRIPT E PROCESSOS: atribua nota de 0 a 10 para ESTE atendimento, avaliando os sete itens: uso correto do script; identificação correta do cliente; conferência de informações; registro no sistema; encaminhamento correto; encerramento correto; cumprimento dos procedimentos. Para cada item retorne status "cumprido", "parcial", "não_cumprido" ou "não_evidenciado", justificativa e evidência. Não invente registros internos que o PDF não mostra. Se não houver evidência de um item, marque "não_evidenciado" e explique; não o trate automaticamente como descumprido.
+A nota de qualidade e a nota de script são independentes. O script não deve ser incorporado à nota de qualidade duas vezes.
+
 FORMATO OBRIGATÓRIO
 {
+  "quality_score_100": 95,
+  "quality_score_justification": "justificativa da nota de qualidade de 0 a 100",
+  "script_score_10": 8,
+  "script_score_justification": "justificativa da nota de script de 0 a 10",
+  "script_checks": [
+    {"criterion": "Utilização correta do script", "status": "cumprido", "justification": "...", "evidence": ["..."]},
+    {"criterion": "Identificação correta do cliente", "status": "cumprido", "justification": "...", "evidence": ["..."]},
+    {"criterion": "Conferência de informações", "status": "parcial", "justification": "...", "evidence": ["..."]},
+    {"criterion": "Registro no sistema", "status": "não_evidenciado", "justification": "O PDF não comprova o registro interno.", "evidence": []},
+    {"criterion": "Encaminhamento correto", "status": "cumprido", "justification": "...", "evidence": ["..."]},
+    {"criterion": "Encerramento correto", "status": "cumprido", "justification": "...", "evidence": ["..."]},
+    {"criterion": "Cumprimento dos procedimentos", "status": "parcial", "justification": "...", "evidence": ["..."]}
+  ],
   "resumo": "parecer técnico curto e objetivo",
   "solicitacao_cliente": "o que o cliente buscava resolver",
   "status_resolucao": "resolvida | parcialmente_resolvida | não_resolvida | não_foi_possivel_concluir",
@@ -243,6 +261,24 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
 
   if (attendanceError) throw new Error(`Não foi possível consolidar os atendimentos do mês: ${attendanceError.message}`);
 
+  const validAnalyses = (analyzedAttendances || []).map((row: any) => row.analysis || {}).filter((a: any) =>
+    Number.isFinite(Number(a.quality_score_100)) && Number.isFinite(Number(a.script_score_10))
+  );
+  const qualityAverage = validAnalyses.length
+    ? Math.round(validAnalyses.reduce((sum: number, a: any) => sum + Number(a.quality_score_100), 0) / validAnalyses.length * 10) / 10
+    : null;
+  const scriptAverage = validAnalyses.length
+    ? Math.round(validAnalyses.reduce((sum: number, a: any) => sum + Number(a.script_score_10), 0) / validAnalyses.length * 10) / 10
+    : null;
+  const { error: monthlyScoreError } = await supabase.from('destaque_avaliacoes').update({
+    quality_avg_100: qualityAverage,
+    quality_points_15: qualityAverage === null ? null : Math.round(qualityAverage * 0.15),
+    script_avg_10: scriptAverage,
+    ai_attendance_count: validAnalyses.length,
+    updated_at: new Date().toISOString(),
+  }).eq('id', evaluation.id);
+  if (monthlyScoreError) throw new Error(`Não foi possível salvar as médias mensais de qualidade/script: ${monthlyScoreError.message}`);
+
   for (const criterion of criteria) {
     const values: number[] = [];
     for (const item of analyzedAttendances || []) {
@@ -281,7 +317,7 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
     if (itemError) throw new Error(`Não foi possível salvar a pontuação mensal de ${criterion.name}: ${itemError.message}`);
   }
 
-  return { evaluation_id: evaluation.id, analyzed_attendances: analyzedAttendances?.length || 0 };
+  return { evaluation_id: evaluation.id, analyzed_attendances: validAnalyses.length, quality_avg_100: qualityAverage, quality_points_15: qualityAverage === null ? null : Math.round(qualityAverage * 0.15), script_avg_10: scriptAverage };
 };
 
 const callGemini = async (model: string, geminiKey: string, prompt: string) => {
@@ -292,6 +328,13 @@ const callGemini = async (model: string, geminiKey: string, prompt: string) => {
       responseSchema: {
         type: 'OBJECT',
         properties: {
+          quality_score_100: { type: 'NUMBER' },
+          quality_score_justification: { type: 'STRING' },
+          script_score_10: { type: 'NUMBER' },
+          script_score_justification: { type: 'STRING' },
+          script_checks: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+            criterion: { type: 'STRING' }, status: { type: 'STRING' }, justification: { type: 'STRING' }, evidence: { type: 'ARRAY', items: { type: 'STRING' } }
+          }, required: ['criterion','status','justification','evidence'] } },
           resumo: { type: 'STRING' },
           solicitacao_cliente: { type: 'STRING' },
           status_resolucao: { type: 'STRING' },
@@ -322,7 +365,7 @@ const callGemini = async (model: string, geminiKey: string, prompt: string) => {
             },
           },
         },
-        required: ['resumo', 'solicitacao_cliente', 'status_resolucao', 'tempo_resposta', 'parecer_especialista', 'criterios'],
+        required: ['quality_score_100','quality_score_justification','script_score_10','script_score_justification','script_checks','resumo', 'solicitacao_cliente', 'status_resolucao', 'tempo_resposta', 'parecer_especialista', 'criterios'],
       },
     },
   };
@@ -358,15 +401,27 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const geminiKey = Deno.env.get('GEMINI_API_KEY');
-  if (!supabaseUrl || !anonKey || !geminiKey) return json({ error: 'Secrets obrigatórios não configurados.' }, 500);
+  if (!supabaseUrl || !anonKey || !serviceKey || !geminiKey) return json({ error: 'Secrets obrigatórios não configurados. Configure SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY e GEMINI_API_KEY.' }, 500);
 
   const authorization = req.headers.get('Authorization');
   if (!authorization) return json({ error: 'Sessão não encontrada.' }, 401);
 
-  const supabase = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authorization } } });
+  const { data: userData, error: userError } = await authClient.auth.getUser();
   if (userError || !userData.user) return json({ error: 'Usuário não autenticado.' }, 401);
+
+  const { data: permission, error: permissionError } = await authClient
+    .from('user_permissions').select('can_create,can_edit,can_view')
+    .eq('user_id', userData.user.id).eq('module', 'destaques').maybeSingle();
+  const { data: profile } = await authClient.from('profiles').select('role,status').eq('id', userData.user.id).maybeSingle();
+  const isAdmin = profile?.role === 'administrador' && profile?.status === 'ativo';
+  if (permissionError || (!isAdmin && !(permission?.can_create || permission?.can_edit))) {
+    return json({ error: 'Você não tem permissão para analisar atendimentos no módulo Destaques.' }, 403);
+  }
+  // A sessão é validada acima. As operações privilegiadas ficam exclusivamente no servidor.
+  const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
   let attendanceId: string;
   try {
@@ -510,13 +565,29 @@ Deno.serve(async (req) => {
     });
 
     const analyzedAt = new Date().toISOString();
+    const qualityScore = parsed?.quality_score_100 !== null && parsed?.quality_score_100 !== undefined && Number.isFinite(Number(parsed.quality_score_100)) ? Math.max(0, Math.min(100, Math.round(Number(parsed.quality_score_100)))) : null;
+    const scriptScore = parsed?.script_score_10 !== null && parsed?.script_score_10 !== undefined && Number.isFinite(Number(parsed.script_score_10)) ? Math.max(0, Math.min(10, Math.round(Number(parsed.script_score_10) * 10) / 10)) : null;
+    const scriptChecks = Array.isArray(parsed?.script_checks) ? parsed.script_checks.slice(0, 7).map((item: any) => ({
+      criterion: String(item?.criterion || ''),
+      status: ['cumprido','parcial','não_cumprido','não_evidenciado'].includes(item?.status) ? item.status : 'não_evidenciado',
+      justification: String(item?.justification || ''),
+      evidence: Array.isArray(item?.evidence) ? item.evidence.slice(0, 5).map((x: any) => String(x)) : [],
+    })) : [];
+    if (qualityScore === null || scriptScore === null || scriptChecks.length !== 7) {
+      throw new Error('A IA não retornou as notas e os sete itens obrigatórios de pontuação. A análise não foi registrada como concluída; tente novamente.');
+    }
     const analysis = {
+      quality_score_100: qualityScore,
+      quality_score_justification: typeof parsed?.quality_score_justification === 'string' ? parsed.quality_score_justification.trim() : '',
+      script_score_10: scriptScore,
+      script_score_justification: typeof parsed?.script_score_justification === 'string' ? parsed.script_score_justification.trim() : '',
+      script_checks: scriptChecks,
       resumo: typeof parsed?.resumo === 'string' && parsed.resumo.trim() ? parsed.resumo.trim() : 'Análise concluída.',
       solicitacao_cliente: typeof parsed?.solicitacao_cliente === 'string' ? parsed.solicitacao_cliente.trim() : '',
       status_resolucao: typeof parsed?.status_resolucao === 'string' ? parsed.status_resolucao : 'não_foi_possivel_concluir',
       tempo_resposta: parsed?.tempo_resposta || null,
       parecer_especialista: typeof parsed?.parecer_especialista === 'string' ? parsed.parecer_especialista.trim() : '',
-      nota_total: normalized.every((x: any) => x.available && x.score !== null) ? (() => { const totalWeight = criteria.reduce((sum: number, c: any) => sum + Number(c.weight || 0), 0); const weighted = normalized.reduce((sum: number, x: any) => { const c = criteria.find((item: any) => item.id === x.criterion_id); return sum + (Number(x.score || 0) * Number(c?.weight || 0)); }, 0); return totalWeight > 0 ? Math.round(((weighted / totalWeight) * 5) * 10) / 10 : null; })() : null,
+      nota_total: qualityScore,
       criterios: normalized,
       analyzed_by: usedModel,
       analyzed_at: analyzedAt,
@@ -532,13 +603,20 @@ Deno.serve(async (req) => {
     const { error: saveError } = await supabase.from('destaque_atendimentos').update({ status: 'analisado', analysis, analyzed_at: analyzedAt, error_message: null }).eq('id', attendance.id);
     if (saveError) throw new Error(`Falha ao salvar análise: ${saveError.message}`);
 
-    const monthly = await syncMonthlyAiScores(supabase, attendance, criteria);
-
-    const { data: consolidatedEvaluation, error: consolidationError } = await supabase
-      .rpc('recalculate_destaque_evaluation', { p_evaluation_id: monthly.evaluation_id });
-
-    if (consolidationError) {
-      throw new Error(`A análise foi salva, mas não foi possível consolidar a pontuação mensal: ${consolidationError.message}`);
+    // A análise individual já foi persistida. Falha na consolidação mensal não deve apagar
+    // nem transformar em erro o histórico individual que foi salvo com sucesso.
+    let monthly: any = null;
+    let monthlyWarning: string | null = null;
+    let consolidatedEvaluation: any = null;
+    try {
+      monthly = await syncMonthlyAiScores(supabase, attendance, criteria);
+      const { data, error: consolidationError } = await supabase
+        .rpc('recalculate_destaque_evaluation', { p_evaluation_id: monthly.evaluation_id });
+      if (consolidationError) throw new Error(consolidationError.message);
+      consolidatedEvaluation = data;
+    } catch (error) {
+      monthlyWarning = error instanceof Error ? error.message : String(error);
+      console.error('Análise individual salva; falha na consolidação mensal:', monthlyWarning);
     }
 
     return json({
@@ -549,6 +627,7 @@ Deno.serve(async (req) => {
       period_key: periodKey,
       analysis,
       monthly,
+      monthly_warning: monthlyWarning,
       evaluation: consolidatedEvaluation,
     });
   } catch (error) {
