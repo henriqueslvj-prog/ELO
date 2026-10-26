@@ -11,9 +11,56 @@ const supabase=(SUPABASE_URL&&SUPABASE_ANON_KEY)?createClient(SUPABASE_URL,SUPAB
 const nav=[['dashboard','Dashboard','⌂'],['demandas','Demandas','✓'],['solicitacoes','Solicitações','↗'],['ideias','Ideias','✦'],['projetos','Projetos','▣'],['arquivos','Arquivos','▤'],['destaques','Destaques','★'],['agenda','Agenda','◷'],['reunioes','Reuniões','◉'],['indicadores','Indicadores','▥']];
 const data={demandas:[['Atualizar procedimento de atendimento','Alta','Mayara','Hoje','Em andamento'],['Relatório mensal de indicadores','Média','Rafael','30/09','Em análise'],['Treinamento da equipe','Média','Yasmin','03/10','Pendente'],['Melhoria do roteiro de atendimento','Baixa','Henrique','07/10','Em andamento']],solicitacoes:[['Verificar computador da recepção','Larissa','TI','Hoje','Em andamento'],['Troca de lâmpada da sala 2','Rafael','Manutenção','30/09','Pendente'],['Solicitar material de escritório','Yasmin','Administrativo','01/10','Em andamento'],['Acesso ao sistema de relatórios','Mayara','TI','02/10','Concluída']],ideias:[['Criar novo processo para reduzir tempo de espera','Henrique','Em análise','Alto'],['Implantar feedback digital do cliente','Mayara','Aprovada','Alto'],['Automatizar lembretes de reuniões','Rafael','Em desenvolvimento','Médio'],['Criar material de treinamento em vídeo','Yasmin','Em análise','Alto']],projetos:[['Novo processo de atendimento','Henrique','30/09','Em andamento'],['Implantação do sistema de relatórios','Rafael','15/10','Em andamento'],['Campanha interna de endomarketing','Mayara','25/10','Planejamento'],['Treinamento da equipe','Yasmin','05/11','Em andamento']]};
 function Icon({children}){return <span className="icon">{children}</span>}
-function Login({onLogin}){const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [loading,setLoading]=useState(false);const [error,setError]=useState('');
- const submit=async e=>{e.preventDefault();setError('');if(!supabase){setError('Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY antes de usar o login.');return}setLoading(true);const {data,error}=await supabase.auth.signInWithPassword({email,password});setLoading(false);if(error){setError('E-mail ou senha inválidos.');return}const {data:profile,error:profileError}=await supabase.from('profiles').select('status').eq('id',data.user.id).single();if(profileError||!profile||profile.status!=='ativo'){await supabase.auth.signOut();setError('Seu acesso não está ativo. Procure o administrador do ELO.');return}onLogin(data.session)};
- return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>Acesso privado</h1><p>Entre com as credenciais fornecidas pelo administrador.</p></div><form onSubmit={submit}><label>E-mail<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username" placeholder="seu@email.com"/></label><label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••"/></label>{error&&<div className="errorBox">{error}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Entrando…':'Entrar no ELO'}</button></form><p className="loginFooter">Acesso restrito a usuários autorizados.</p></div></div>}
+function Login({onLogin}){
+ const [email,setEmail]=useState('');
+ const [password,setPassword]=useState('');
+ const [loading,setLoading]=useState(false);
+ const [error,setError]=useState('');
+ const [notice,setNotice]=useState('');
+ const [mode,setMode]=useState('login');
+ const submit=async e=>{
+   e.preventDefault();setError('');setNotice('');
+   if(!supabase){setError('Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY antes de usar o login.');return}
+   setLoading(true);
+   const {data,error}=await supabase.auth.signInWithPassword({email,password});
+   setLoading(false);
+   if(error){setError('E-mail ou senha inválidos.');return}
+   const {data:profile,error:profileError}=await supabase.from('profiles').select('status').eq('id',data.user.id).single();
+   if(profileError||!profile||profile.status!=='ativo'){await supabase.auth.signOut();setError('Seu acesso não está ativo. Procure o administrador do ELO.');return}
+   onLogin(data.session)
+ };
+ const sendReset=async e=>{
+   e.preventDefault();setError('');setNotice('');
+   if(!supabase){setError('O serviço de autenticação não está configurado.');return}
+   if(!email.trim()){setError('Informe o e-mail cadastrado para receber o link de recuperação.');return}
+   setLoading(true);
+   const redirectTo=`${window.location.origin}/?reset-password=1`;
+   const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo});
+   setLoading(false);
+   if(error){setError('Não foi possível enviar o e-mail de recuperação. Verifique a configuração de URLs no Supabase e tente novamente.');return}
+   setNotice('Se esse e-mail estiver cadastrado, você receberá um link para redefinir sua senha. Verifique também a caixa de spam.');
+ };
+ return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>{mode==='login'?'Acesso privado':'Recuperar senha'}</h1><p>{mode==='login'?'Entre com as credenciais fornecidas pelo administrador.':'Informe o e-mail vinculado à sua conta ELO para receber o link de recuperação.'}</p></div>{mode==='login'?<form onSubmit={submit}><label>E-mail<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username" placeholder="seu@email.com"/></label><label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••"/></label>{error&&<div className="errorBox">{error}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Entrando…':'Entrar no ELO'}</button><button type="button" className="textLink" onClick={()=>{setMode('recovery');setError('');setNotice('')}}>Esqueceu sua senha?</button></form>:<form onSubmit={sendReset}><label>E-mail cadastrado<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" placeholder="seu@email.com"/></label>{error&&<div className="errorBox">{error}</div>}{notice&&<div className="notice">{notice}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Enviando…':'Enviar link de recuperação'}</button><button type="button" className="textLink" onClick={()=>{setMode('login');setError('');setNotice('')}}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.</p></div></div>}
+function ResetPassword({onBack,hasSession}){
+ const [password,setPassword]=useState('');
+ const [confirm,setConfirm]=useState('');
+ const [loading,setLoading]=useState(false);
+ const [error,setError]=useState('');
+ const [success,setSuccess]=useState(false);
+ const save=async e=>{
+   e.preventDefault();setError('');
+   if(password.length<8){setError('A nova senha deve ter pelo menos 8 caracteres.');return}
+   if(password!==confirm){setError('As senhas não correspondem.');return}
+   if(!supabase){setError('O serviço de autenticação não está configurado.');return}
+   setLoading(true);
+   const {error}=await supabase.auth.updateUser({password});
+   setLoading(false);
+   if(error){setError('Não foi possível alterar a senha. O link pode ter expirado; solicite um novo link de recuperação.');return}
+   setSuccess(true);
+   await supabase.auth.signOut();
+   window.history.replaceState({},document.title,window.location.pathname);
+ };
+ return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>Nova senha</h1><p>Crie uma nova senha para recuperar o acesso à sua conta.</p></div>{!hasSession?<><div className="errorBox">Este link de recuperação é inválido ou expirou. Solicite um novo link na tela de login.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:success?<><div className="notice">Senha alterada com sucesso. Você já pode entrar no ELO com a nova senha.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:<form onSubmit={save}><label>Nova senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={8} autoComplete="new-password" placeholder="Mínimo de 8 caracteres"/></label><label>Confirmar nova senha<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} required minLength={8} autoComplete="new-password" placeholder="Digite a senha novamente"/></label>{error&&<div className="errorBox">{error}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Salvando…':'Salvar nova senha'}</button><button type="button" className="textLink" onClick={onBack}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.</p></div></div>}
 function App({session,profile}){const [page,setPage]=useState('dashboard');const [menu,setMenu]=useState(false);const [light,setLight]=useState(false);const [showUsers,setShowUsers]=useState(false);const [newRequestSignal,setNewRequestSignal]=useState(0);const title=nav.find(n=>n[0]===page)?.[1]||'Dashboard';const email=session?.user?.email||'Usuário';const displayName=profile?.full_name||email;const initials=(displayName[0]||'N').toUpperCase();
  const logout=async()=>{if(supabase)await supabase.auth.signOut()};
  return <div className={light?'app light':'app'}><header className="topbar"><button className="menuBtn" onClick={()=>setMenu(true)} aria-label="Abrir menu"><span></span><span></span><span></span></button><div className="brand"><img src={mark}/><div><strong>ELO</strong><small>GESTÃO • ORGANIZAÇÃO • RESULTADOS</small></div></div><div className="topActions"><button className="ghost" onClick={()=>setLight(!light)}>{light?'☾':'☼'}</button><button className="bell">♧<i></i></button><div className="user"><div className="avatar">{initials}</div><div><b>{displayName}</b><small>{profile?.role||'Usuário autorizado'}</small></div></div></div></header><main className="main"><div className="heading"><div><p className="eyebrow">VISÃO GERAL</p><h1>{title}</h1><p className="muted">Acompanhe pessoas, ideias, demandas e resultados em um só lugar.</p></div>{page==='solicitacoes'&&<button className="primary headingAction" onClick={()=>setNewRequestSignal(v=>v+1)}>＋ Nova solicitação</button>}</div>{page==='dashboard'&&<Dashboard/>}{page==='demandas'&&<DemandasManager currentUser={profile}/>} {page==='solicitacoes'&&<SolicitacoesManager currentUser={profile} openSignal={newRequestSignal}/>} {page==='ideias'&&<TablePage rows={data.ideias} headers={['Ideia','Autor','Status','Impacto']}/>} {page==='projetos'&&<TablePage rows={data.projetos} headers={['Projeto','Responsável','Prazo','Status']}/>} {['arquivos','agenda','reunioes','indicadores'].includes(page)&&<Placeholder page={title}/>} {page==='destaques'&&<DestaquesManager currentUser={profile}/>} {showUsers&&<UserManager onClose={()=>setShowUsers(false)}/>}</main>{menu&&<><div className="overlay" onClick={()=>setMenu(false)}></div><aside className="drawer"><div className="drawerHead"><div className="brand"><img src={mark}/><div><strong>ELO</strong><small>GESTÃO • ORGANIZAÇÃO • RESULTADOS</small></div></div><button onClick={()=>setMenu(false)}>×</button></div><nav>{nav.map(([id,label,ic])=><button key={id} className={page===id?'active':''} onClick={()=>{setPage(id);setMenu(false)}}><Icon>{ic}</Icon>{label}</button>)}</nav><div className="drawerBottom"><button onClick={()=>{setShowUsers(true);setMenu(false)}}><Icon>♙</Icon> Usuários</button><button><Icon>⚙</Icon> Configurações</button><button onClick={logout}><Icon>↪</Icon> Sair</button><div className="profile"><div className="avatar">{initials}</div><div><b>{displayName}</b><small>{profile?.role||'Conta autenticada'}</small></div></div></div></aside></>}</div>}
@@ -243,6 +290,12 @@ function Root(){
  const [session,setSession]=useState(undefined);
  const [profile,setProfile]=useState(null);
  const [authError,setAuthError]=useState('');
+ const [resetRoute,setResetRoute]=useState(()=>new URLSearchParams(window.location.search).get('reset-password')==='1');
+ const returnToLogin=async()=>{
+   if(supabase)await supabase.auth.signOut();
+   window.history.replaceState({},document.title,window.location.pathname);
+   setResetRoute(false);setSession(null);setProfile(null);
+ };
  const loadSession=async()=>{
    if(!supabase){setSession(null);return}
    const {data:{session}}=await supabase.auth.getSession();
@@ -251,8 +304,7 @@ function Root(){
      const {data,error}=await supabase.from('profiles').select('*').eq('id',session.user.id).single();
      if(error||!data||data.status!=='ativo'){
        await supabase.auth.signOut();
-       setSession(null);
-       setProfile(null);
+       setSession(null);setProfile(null);
        setAuthError('Seu acesso não está ativo. Procure o administrador do ELO.');
        return;
      }
@@ -275,6 +327,10 @@ function Root(){
    });
    return()=>subscription.unsubscribe();
  },[]);
+ if(resetRoute){
+   if(session===undefined)return <div className="loading">Validando link de recuperação…</div>;
+   return <ResetPassword onBack={returnToLogin} hasSession={!!session}/>;
+ }
  if(session===undefined)return <div className="loading">Carregando ELO…</div>;
  if(!session)return <Login onLogin={setSession}/>;
  if(!profile)return <div className="loading">Validando acesso…</div>;

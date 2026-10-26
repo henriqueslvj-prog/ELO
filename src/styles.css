@@ -142,3 +142,6 @@
 .analysisFacts b{display:block;font-size:12px;line-height:1.45;color:#dbe3df}
 @media(max-width:900px){.analysisTopGrid{grid-template-columns:1fr}.analysisFacts{grid-template-columns:1fr 1fr}.analysisActions{flex-wrap:wrap}}
 @media(max-width:560px){.analysisFacts{grid-template-columns:1fr}.attendanceItem{gap:8px}.attendanceStatus{margin-left:auto}.attendanceDelete{width:32px;height:32px;flex-basis:32px}.analysisActions button{font-size:11px;padding:8px 9px}}
+
+/* Recuperação de senha — ELO V0.13.1 */
+.textLink{justify-self:center;background:transparent;border:0;color:#43c98a;font:inherit;font-size:11px;cursor:pointer;padding:5px 8px;margin-top:2px}.textLink:hover{color:#8be7b7;text-decoration:underline}.loginCard .notice{font-size:11px;line-height:1.55;text-align:left}.loginCard .errorBox{font-size:11px;line-height:1.55;text-align:left}
