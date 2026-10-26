@@ -261,9 +261,15 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
 
   if (attendanceError) throw new Error(`Não foi possível consolidar os atendimentos do mês: ${attendanceError.message}`);
 
-  const validAnalyses = (analyzedAttendances || []).map((row: any) => row.analysis || {}).filter((a: any) =>
-    Number.isFinite(Number(a.quality_score_100)) && Number.isFinite(Number(a.script_score_10))
-  );
+  const validAnalyses = (analyzedAttendances || [])
+    .map((row: any) => row.analysis || {})
+    .filter((a: any) =>
+      a.quality_score_100 !== null && a.quality_score_100 !== undefined && a.quality_score_100 !== '' &&
+      a.script_score_10 !== null && a.script_score_10 !== undefined && a.script_score_10 !== '' &&
+      Number.isFinite(Number(a.quality_score_100)) && Number.isFinite(Number(a.script_score_10)) &&
+      Number(a.quality_score_100) >= 0 && Number(a.quality_score_100) <= 100 &&
+      Number(a.script_score_10) >= 0 && Number(a.script_score_10) <= 10
+    );
   const qualityAverage = validAnalyses.length
     ? Math.round(validAnalyses.reduce((sum: number, a: any) => sum + Number(a.quality_score_100), 0) / validAnalyses.length * 10) / 10
     : null;
@@ -487,7 +493,13 @@ Deno.serve(async (req) => {
     referencesByCriterion.set(link.criterion_id, list);
   }
 
-  await supabase.from('destaque_atendimentos').update({ status: 'analisando', error_message: null }).eq('id', attendance.id);
+  const { error: startingError } = await supabase
+    .from('destaque_atendimentos')
+    .update({ status: 'analisando', error_message: null })
+    .eq('id', attendance.id);
+  if (startingError) {
+    return json({ error: `Não foi possível iniciar a análise: ${startingError.message}` }, 500);
+  }
 
   try {
     const { data: pdf, error: downloadError } = await supabase.storage.from('destaque-atendimentos').download(attendance.storage_path);
@@ -567,13 +579,33 @@ Deno.serve(async (req) => {
     const analyzedAt = new Date().toISOString();
     const qualityScore = parsed?.quality_score_100 !== null && parsed?.quality_score_100 !== undefined && Number.isFinite(Number(parsed.quality_score_100)) ? Math.max(0, Math.min(100, Math.round(Number(parsed.quality_score_100)))) : null;
     const scriptScore = parsed?.script_score_10 !== null && parsed?.script_score_10 !== undefined && Number.isFinite(Number(parsed.script_score_10)) ? Math.max(0, Math.min(10, Math.round(Number(parsed.script_score_10) * 10) / 10)) : null;
-    const scriptChecks = Array.isArray(parsed?.script_checks) ? parsed.script_checks.slice(0, 7).map((item: any) => ({
-      criterion: String(item?.criterion || ''),
-      status: ['cumprido','parcial','não_cumprido','não_evidenciado'].includes(item?.status) ? item.status : 'não_evidenciado',
-      justification: String(item?.justification || ''),
-      evidence: Array.isArray(item?.evidence) ? item.evidence.slice(0, 5).map((x: any) => String(x)) : [],
-    })) : [];
-    if (qualityScore === null || scriptScore === null || scriptChecks.length !== 7) {
+    const expectedScriptCriteria = [
+      'Utilização correta do script',
+      'Identificação correta do cliente',
+      'Conferência de informações',
+      'Registro no sistema',
+      'Encaminhamento correto',
+      'Encerramento correto',
+      'Cumprimento dos procedimentos',
+    ];
+    const rawScriptChecks = Array.isArray(parsed?.script_checks) ? parsed.script_checks : [];
+    const normalizeLabel = (value: unknown) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const unusedScriptChecks = [...rawScriptChecks];
+    const scriptChecks = expectedScriptCriteria.map((expected) => {
+      const expectedLabel = normalizeLabel(expected);
+      const matchIndex = unusedScriptChecks.findIndex((candidate: any) => {
+        const label = normalizeLabel(candidate?.criterion);
+        return Boolean(label) && (label === expectedLabel || label.includes(expectedLabel) || expectedLabel.includes(label));
+      });
+      const item = matchIndex >= 0 ? unusedScriptChecks.splice(matchIndex, 1)[0] : null;
+      return {
+        criterion: expected,
+        status: ['cumprido','parcial','não_cumprido','não_evidenciado'].includes(item?.status) ? item.status : 'não_evidenciado',
+        justification: String(item?.justification || 'A IA não apresentou justificativa suficiente para este item.'),
+        evidence: Array.isArray(item?.evidence) ? item.evidence.slice(0, 5).map((x: any) => String(x)) : [],
+      };
+    });
+    if (qualityScore === null || scriptScore === null || rawScriptChecks.length < 7) {
       throw new Error('A IA não retornou as notas e os sete itens obrigatórios de pontuação. A análise não foi registrada como concluída; tente novamente.');
     }
     const analysis = {
