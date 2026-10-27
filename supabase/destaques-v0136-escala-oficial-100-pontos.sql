@@ -61,7 +61,7 @@ from public.destaque_criterios c
 where c.id = i.criterion_id and i.manual_score is not null and i.manual_score <= 3;
 
 create or replace function public.recalculate_destaque_evaluation(p_evaluation_id uuid)
-returns public.destaque_avaliacoes
+returns numeric
 language plpgsql
 security definer
 set search_path = public
@@ -124,7 +124,7 @@ begin
       updated_at = now()
   where id = p_evaluation_id
   returning * into v_eval;
-  return v_eval;
+  return v_eval.final_score;
 end;
 $$;
 
