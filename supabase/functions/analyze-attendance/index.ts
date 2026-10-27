@@ -1,5 +1,4 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
-import { getDocument } from 'npm:pdfjs-dist@4.10.38/legacy/build/pdf.mjs';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -29,36 +28,36 @@ const normalizeScore = (value: unknown) => {
   return Math.max(0, Math.min(3, Math.round(n * 10) / 10));
 };
 
-const extractPdfText = async (buffer: ArrayBuffer) => {
-  const data = new Uint8Array(buffer);
-  const loadingTask = getDocument({ data, disableWorker: true, useSystemFonts: true, isEvalSupported: false });
-  const pdf = await loadingTask.promise;
-  const pages: string[] = [];
+const MAX_PDF_BYTES = 14 * 1024 * 1024; // inline do Gemini: ~20 MB no total, e o base64 aumenta ~33%
+const MAX_TXT_BYTES = 2 * 1024 * 1024;
 
-  try {
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-      const page = await pdf.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item: any) => typeof item?.str === 'string' ? item.str : '')
-        .join(' ')
-        .replace(/[ \t]+/g, ' ')
-        .trim();
-      if (pageText) pages.push(`--- PÁGINA ${pageNumber} ---\n${pageText}`);
-    }
-  } finally {
-    await pdf.destroy();
+const bytesToBase64 = (bytes: Uint8Array) => {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
+  return btoa(binary);
+};
 
-  const text = pages.join('\n\n').trim();
-  return { text, pageCount: pages.length, totalPages: pdf.numPages, characters: text.length };
+const decodeText = (bytes: Uint8Array) => {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  catch { return new TextDecoder('windows-1252').decode(bytes); } // TXT exportado em ANSI
+};
+
+// Detecta o tipo pelo nome do arquivo e/ou pelos primeiros bytes (%PDF-).
+const detectKind = (fileName: string, bytes: Uint8Array): 'pdf' | 'txt' => {
+  const isPdfMagic = bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+  if (isPdfMagic || /\.pdf$/i.test(fileName)) return 'pdf';
+  if (/\.txt$/i.test(fileName)) return 'txt';
+  return 'txt';
 };
 
 const buildPrompt = (
   employee: any,
   criteria: any[],
   referencesByCriterion: Map<string, any[]>,
-  attendanceText: string,
+  attendance: { kind: 'pdf' | 'txt'; text?: string },
 ) => {
   const criteriaText = criteria.map((criterion) => {
     const references = referencesByCriterion.get(criterion.id) || [];
@@ -121,6 +120,7 @@ A nota de qualidade e a nota de script são independentes. O script não deve se
 
 FORMATO OBRIGATÓRIO
 {
+  "attendance_date": "2026-10-15",
   "quality_score_100": 95,
   "quality_score_justification": "justificativa da nota de qualidade de 0 a 100",
   "script_score_10": 8,
@@ -156,10 +156,12 @@ FORMATO OBRIGATÓRIO
   ]
 }
 
-TEXTO EXTRAÍDO DO PDF
-======================
-${attendanceText}
-======================`;
+DATA DO ATENDIMENTO
+Identifique a data em que o atendimento ocorreu (normalmente a data da primeira mensagem ou do protocolo) e retorne em "attendance_date" no formato AAAA-MM-DD. Considere datas no padrão brasileiro DD/MM/AAAA. Se o documento não trouxer data, retorne null. Não invente a data.
+
+${attendance.kind === 'pdf'
+  ? 'O ATENDIMENTO ESTÁ NO DOCUMENTO PDF ANEXADO A ESTA MENSAGEM. Leia todas as páginas (inclusive se o conteúdo for imagem/print de conversa).'
+  : `TEXTO DO ATENDIMENTO (ARQUIVO TXT)\n======================\n${attendance.text}\n======================`}`;
 };
 
 const detectAttendanceDate = (text: string) => {
@@ -326,14 +328,17 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
   return { evaluation_id: evaluation.id, analyzed_attendances: validAnalyses.length, quality_avg_100: qualityAverage, quality_points_15: qualityAverage === null ? null : Math.round(qualityAverage * 0.15), script_avg_10: scriptAverage };
 };
 
-const callGemini = async (model: string, geminiKey: string, prompt: string) => {
+const callGemini = async (model: string, geminiKey: string, parts: any[]) => {
   const body = {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: [{ role: 'user', parts }],
     generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 16384,
       responseMimeType: 'application/json',
       responseSchema: {
         type: 'OBJECT',
         properties: {
+          attendance_date: { type: 'STRING', nullable: true },
           quality_score_100: { type: 'NUMBER' },
           quality_score_justification: { type: 'STRING' },
           script_score_10: { type: 'NUMBER' },
@@ -505,18 +510,48 @@ Deno.serve(async (req) => {
     const { data: pdf, error: downloadError } = await supabase.storage.from('destaque-atendimentos').download(attendance.storage_path);
     if (downloadError || !pdf) throw new Error(downloadError?.message || 'Não foi possível baixar o PDF do Storage.');
 
-    const pdfBytes = await pdf.arrayBuffer();
-    const maxBytes = 20 * 1024 * 1024;
-    if (pdfBytes.byteLength > maxBytes) throw new Error('PDF muito grande. Envie um arquivo de até 20 MB.');
+    const fileBytes = new Uint8Array(await pdf.arrayBuffer());
+    const kind = detectKind(attendance.file_name || attendance.storage_path, fileBytes);
+    if (kind === 'pdf' && fileBytes.byteLength > MAX_PDF_BYTES) throw new Error('PDF muito grande. Envie um arquivo de até 14 MB.');
+    if (kind === 'txt' && fileBytes.byteLength > MAX_TXT_BYTES) throw new Error('TXT muito grande. Envie um arquivo de até 2 MB.');
+    if (fileBytes.byteLength === 0) throw new Error('O arquivo enviado está vazio.');
 
-    const extraction = await extractPdfText(pdfBytes);
-    if (!extraction.text || extraction.characters < 80) {
-      throw new Error('Este PDF não possui texto selecionável suficiente para análise automática. O próximo passo é habilitar OCR para PDFs escaneados ou baseados em imagem.');
+    // PDF: enviado diretamente ao Gemini (lê texto e também PDFs escaneados/imagem). TXT: lido como texto.
+    let attendanceText = '';
+    const parts: any[] = [];
+    if (kind === 'txt') {
+      attendanceText = decodeText(fileBytes).replace(/\u0000/g, '').trim();
+      if (attendanceText.length < 40) throw new Error('O TXT não possui conteúdo suficiente para análise.');
     }
+    const prompt = buildPrompt(employee, criteria, referencesByCriterion, { kind, text: attendanceText });
+    parts.push({ text: prompt });
+    if (kind === 'pdf') parts.push({ inline_data: { mime_type: 'application/pdf', data: bytesToBase64(fileBytes) } });
 
-    const attendanceDate = detectAttendanceDate(extraction.text);
+    // Cadeia de modelos: GEMINI_MODEL (opcional, secret) e depois fallbacks.
+    const models = [...new Set([Deno.env.get('GEMINI_MODEL'), 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'].filter(Boolean) as string[])];
+    let parsed: any;
+    let usedModel = models[0];
+    const errors: string[] = [];
+    for (const model of models) {
+      try {
+        parsed = await callGemini(model, geminiKey, parts);
+        usedModel = model;
+        break;
+      } catch (error) {
+        const status = Number((error as any)?.status || 0);
+        errors.push(error instanceof Error ? error.message : String(error));
+        // Tenta o próximo modelo em: modelo inexistente/indisponível (404), limite (429), erro de servidor (5xx) ou resposta inválida (sem status).
+        const retryable = status === 0 || status === 404 || status === 429 || status >= 500;
+        if (!retryable) break;
+      }
+    }
+    if (!parsed) throw new Error(`Não foi possível realizar a análise com a IA. ${errors.join(' | ')}`);
+
+    // Data do atendimento: informada pela IA (PDF/TXT) ou detectada no texto (TXT).
+    const isValidIso = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+    const attendanceDate = (isValidIso(parsed?.attendance_date) ? parsed.attendance_date : null) || (kind === 'txt' ? detectAttendanceDate(attendanceText) : null);
     if (!attendanceDate) {
-      throw new Error('Não foi possível identificar a data do atendimento no PDF. Verifique se o documento contém a data no formato DD/MM/AAAA.');
+      throw new Error('Não foi possível identificar a data do atendimento no documento. Verifique se ele contém a data no formato DD/MM/AAAA.');
     }
 
     const periodKey = attendanceDate.slice(0, 7);
@@ -524,13 +559,8 @@ Deno.serve(async (req) => {
 
     const { error: attendancePeriodError } = await supabase
       .from('destaque_atendimentos')
-      .update({
-        cycle_id: targetCycle.id,
-        attendance_date: attendanceDate,
-        period_key: periodKey,
-      })
+      .update({ cycle_id: targetCycle.id, attendance_date: attendanceDate, period_key: periodKey })
       .eq('id', attendance.id);
-
     if (attendancePeriodError) {
       throw new Error(`Não foi possível vincular o atendimento ao período ${periodKey}: ${attendancePeriodError.message}`);
     }
@@ -538,25 +568,6 @@ Deno.serve(async (req) => {
     attendance.cycle_id = targetCycle.id;
     attendance.attendance_date = attendanceDate;
     attendance.period_key = periodKey;
-
-    const prompt = buildPrompt(employee, criteria, referencesByCriterion, extraction.text);
-    let parsed: any;
-    let usedModel = 'gemini-3.6-flash';
-    const errors: string[] = [];
-
-    try {
-      parsed = await callGemini('gemini-3.6-flash', geminiKey, prompt);
-    } catch (error) {
-      const status = Number((error as any)?.status || 0);
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(message);
-      if ([429, 500, 502, 503, 504].includes(status)) {
-        usedModel = 'gemini-3.5-flash-lite';
-        try { parsed = await callGemini(usedModel, geminiKey, prompt); }
-        catch (fallbackError) { errors.push(fallbackError instanceof Error ? fallbackError.message : String(fallbackError)); }
-      }
-      if (!parsed) throw new Error(`Não foi possível realizar a análise com os modelos Gemini configurados. ${errors.join(' | ')}`);
-    }
 
     const returned = Array.isArray(parsed?.criterios) ? parsed.criterios : [];
     const normalized = criteria.map((criterion: any) => {
@@ -624,10 +635,10 @@ Deno.serve(async (req) => {
       analyzed_by: usedModel,
       analyzed_at: analyzedAt,
       extraction: {
-        method: 'pdf-text',
-        total_pages: extraction.totalPages,
-        pages_with_text: extraction.pageCount,
-        characters: extraction.characters,
+        method: kind === 'pdf' ? 'pdf-native' : 'txt',
+        file_name: attendance.file_name,
+        bytes: fileBytes.byteLength,
+        characters: kind === 'txt' ? attendanceText.length : null,
       },
       references: references.map((r: any) => ({ id: r.id, name: r.name, type: r.reference_type, version: r.version })),
     };
