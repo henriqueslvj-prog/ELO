@@ -21,11 +21,11 @@ const extractJson = (text: string) => {
   throw new Error('A IA não retornou um JSON válido.');
 };
 
-const normalizeScore = (value: unknown) => {
+const normalizeScore = (value: unknown, maxPoints = 3) => {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
-  return Math.max(0, Math.min(3, Math.round(n * 10) / 10));
+  return Math.max(0, Math.min(maxPoints, Math.round(n * 10) / 10));
 };
 
 const MAX_PDF_BYTES = 14 * 1024 * 1024; // inline do Gemini: ~20 MB no total, e o base64 aumenta ~33%
@@ -65,7 +65,7 @@ const buildPrompt = (
       ? references.map((reference: any) => `\nBASE DE REFERÊNCIA — ${reference.name} (versão ${reference.version})\n${reference.content}`).join('\n')
       : '\nBASE DE REFERÊNCIA: nenhuma referência adicional vinculada a este critério.';
 
-    return `- ID: ${criterion.id}\n  Critério: ${criterion.name}\n  Regra: ${criterion.description || 'Avalie conforme evidências objetivas do atendimento.'}\n  Peso: ${criterion.weight}%\n  Nota mínima configurada: ${criterion.min_score}/3\n  Obrigatório: ${criterion.required ? 'sim' : 'não'}\n${referenceText}`;
+    return `- ID: ${criterion.id}\n  Critério: ${criterion.name}\n  Regra: ${criterion.description || 'Avalie conforme evidências objetivas do atendimento.'}\n  Peso: ${criterion.weight}%\n  Pontuação máxima: ${criterion.weight} pontos\n  Obrigatório: ${criterion.required ? 'sim' : 'não'}\n${referenceText}`;
   }).join('\n\n');
 
   return `Você é um ESPECIALISTA SÊNIOR EM QUALIDADE DE ATENDIMENTO, auditor de atendimento humano e avaliador técnico do ELO.
@@ -86,12 +86,10 @@ O QUE VOCÊ DEVE ANALISAR
 4. Se a solicitação do cliente foi resolvida, parcialmente resolvida, ficou pendente ou não foi possível concluir.
 5. Se o atendente conduziu o atendimento com profissionalismo, domínio do processo, organização e fechamento adequado.
 
-ESCALA OBRIGATÓRIA POR CRITÉRIO — 0 A 3 PONTOS
-- 3.0 = excelência: comportamento claramente demonstrado e consistente, sem falha relevante.
-- 2.0 = adequado: atende ao esperado, com pequena oportunidade de melhoria.
-- 1.0 = insuficiente: falha relevante ou execução apenas parcial.
-- 0.0 = inadequado: falha grave, ausência injustificada ou condução incompatível com o padrão.
-Você pode usar décimos entre esses níveis (ex.: 2.4, 2.7), mas nunca ultrapasse 3.0.
+ESCALA OFICIAL POR CRITÉRIO
+A pontuação máxima de cada critério é o valor indicado em "Peso" (que corresponde ao máximo em pontos, e não a uma porcentagem para multiplicar novamente).
+Atribua uma nota proporcional entre 0 e esse máximo. Exemplos: para máximo 25, use 0–25; máximo 20, use 0–20; máximo 15, use 0–15; máximo 10, use 0–10; máximo 5, use 0–5.
+Use décimos quando necessário. Nunca ultrapasse o máximo do critério.
 
 REGRAS DE AUDITORIA
 - Analise somente ações e mensagens atribuíveis ao atendente humano.
@@ -293,7 +291,7 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
       const criterionResult = item?.analysis?.criterios?.find((x: any) =>
         x?.criterion_id === criterion.id || x?.criterion_name === criterion.name
       );
-      const score = normalizeScore(criterionResult?.score);
+      const score = normalizeScore(criterionResult?.score, Number(criterion.weight || 0));
       if (criterionResult?.available === true && score !== null) values.push(score);
     }
 
@@ -578,7 +576,7 @@ Deno.serve(async (req) => {
     const returned = Array.isArray(parsed?.criterios) ? parsed.criterios : [];
     const normalized = criteria.map((criterion: any) => {
       const item = returned.find((candidate: any) => candidate?.criterion_id === criterion.id || candidate?.criterion_name === criterion.name);
-      const score = normalizeScore(item?.score);
+      const score = normalizeScore(item?.score, Number(criterion.weight || 0));
       const available = item?.available === true && score !== null;
       const refs = referencesByCriterion.get(criterion.id) || [];
       return {
