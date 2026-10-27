@@ -60,7 +60,7 @@ set manual_score = round((i.manual_score / 3.0) * c.weight, 1)
 from public.destaque_criterios c
 where c.id = i.criterion_id and i.manual_score is not null and i.manual_score <= 3;
 
-create or replace function public.recalculate_destaque_evaluation(p_evaluation_id uuid)
+create or replace function public.recalculate_destaque_evaluation(target_evaluation_id uuid)
 returns numeric
 language plpgsql
 security definer
@@ -82,14 +82,14 @@ begin
     raise exception 'Sem permissão para consolidar avaliação.';
   end if;
 
-  select * into v_eval from public.destaque_avaliacoes where id = p_evaluation_id;
+  select * into v_eval from public.destaque_avaliacoes where id = target_evaluation_id;
   if not found then raise exception 'Avaliação mensal não encontrada.'; end if;
 
   for v_item in
     select c.id,c.name,c.weight,c.required,c.min_score,i.score,i.manual_score,i.reviewed_score
     from public.destaque_criterios c
     left join public.destaque_avaliacao_itens i
-      on i.evaluation_id = p_evaluation_id and i.criterion_id = c.id
+      on i.evaluation_id = target_evaluation_id and i.criterion_id = c.id
     where c.active = true
   loop
     v_max_points := v_max_points + coalesce(v_item.weight,0);
@@ -122,7 +122,7 @@ begin
       ineligibility_reason = v_reason,
       status = case when v_complete then 'validada' else 'em_avaliacao' end,
       updated_at = now()
-  where id = p_evaluation_id
+  where id = target_evaluation_id
   returning * into v_eval;
   return v_eval.final_score;
 end;
