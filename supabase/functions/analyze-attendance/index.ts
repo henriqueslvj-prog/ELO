@@ -449,7 +449,13 @@ Deno.serve(async (req) => {
     .eq('id', attendanceId)
     .is('evaluation_deleted_at', null)
     .single();
-  if (attendanceError || !attendance) return json({ error: attendanceError?.message || 'Atendimento não encontrado.' }, 404);
+  if (attendanceError || !attendance) {
+    console.error('Falha ao carregar atendimento', attendanceId, attendanceError);
+    const detail = attendanceError
+      ? `Não foi possível carregar o atendimento (${attendanceError.code || 'sem código'}): ${attendanceError.message}${attendanceError.hint ? ' — ' + attendanceError.hint : ''}`
+      : 'Atendimento não encontrado ou já excluído.';
+    return json({ error: detail }, 404);
+  }
 
   const { data: criteria, error: criteriaError } = await supabase
     .from('destaque_criterios')
