@@ -145,3 +145,93 @@
 
 /* Recuperação de senha — ELO V0.13.1 */
 .textLink{justify-self:center;background:transparent;border:0;color:#43c98a;font:inherit;font-size:11px;cursor:pointer;padding:5px 8px;margin-top:2px}.textLink:hover{color:#8be7b7;text-decoration:underline}.loginCard .notice{font-size:11px;line-height:1.55;text-align:left}.loginCard .errorBox{font-size:11px;line-height:1.55;text-align:left}
+/* ===== Módulo Relatórios V0.14 ===== */
+.relatoriosPage{display:grid;gap:16px}
+.relatoriosPage .demandToolbar{grid-template-columns:minmax(260px,1fr) 200px 0 auto}
+.obsRow{grid-template-columns:100px minmax(260px,1fr) 140px 66px;min-width:640px;padding:15px 18px}
+.obsRow:not(.th):hover,.reportRow:not(.th):hover{background:rgba(30,205,133,.035)}
+.obsRow small,.reportRow small{display:block;margin-top:4px;color:#6f887c;font-size:10px;line-height:1.5;white-space:pre-line}
+.reportRow{grid-template-columns:minmax(200px,1fr) 110px 66px;padding:14px 16px}
+.reportRow.selected{background:rgba(30,205,133,.07)}
+.reportsLayout{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:16px;align-items:start}
+.reportBuilder{display:grid;gap:18px;padding:26px;max-width:720px}
+.reportBuilder h2{margin:4px 0 6px;font-size:22px}
+.reportBuilder label{display:grid;gap:7px;color:#90a99e;font-size:10px;font-weight:700}
+.reportBuilder input{height:44px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:#0a1b14;color:#e5f1eb;padding:0 13px;font:600 12px Inter,sans-serif;color-scheme:dark}
+.reportBuilder .primary{height:46px}
+.kindSwitch{display:flex;gap:6px;padding:5px;border:1px solid rgba(255,255,255,.07);background:#07160f;border-radius:13px;width:max-content;max-width:100%}
+.kindSwitch button{border:0;background:transparent;color:#708a7e;padding:10px 18px;border-radius:9px;font-size:11px;font-weight:750;cursor:pointer}
+.kindSwitch button.active{background:#0d3525;color:#58d99e;box-shadow:inset 0 0 0 1px rgba(76,215,153,.1)}
+.periodBox{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.periodBox>div{padding:14px 16px;border:1px solid rgba(255,255,255,.065);border-radius:14px;background:rgba(8,24,17,.7)}
+.periodBox small{display:block;color:#6f887c;font-size:10px;font-weight:700;margin-bottom:6px}
+.periodBox b{font-size:15px;color:#edf8f2}
+.reportDoc{padding:0;border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden;background:linear-gradient(160deg,rgba(10,28,20,.98),rgba(5,16,12,.99));display:grid;gap:0;color:#e8f3ed}
+.reportCover{position:relative;padding:30px 32px 26px;background:radial-gradient(ellipse at 95% 100%,rgba(47,116,91,.12),transparent 42%),linear-gradient(135deg,#f4f5f2,#e6e8e4);border-bottom:3px solid #d6bd55;color:#202820}
+.reportBrand{display:flex;align-items:center;gap:11px;margin-bottom:32px;min-height:54px}
+.reportBrand img{width:180px;height:auto;max-height:76px;object-fit:contain;object-position:left center}
+.reportBrand div{display:grid;gap:3px}
+.reportBrand strong{font-size:17px;letter-spacing:3px;color:#f1fff7}
+.reportBrand span{font-size:8px;letter-spacing:1.5px;color:#8eb8a0}
+.reportCoverLabel{position:absolute;right:32px;top:36px;color:#566258;font-size:9px;letter-spacing:1.8px;font-weight:800}
+.reportCover .eyebrow{margin:0 0 8px;color:#6d6224;font-size:10px;font-weight:800;letter-spacing:1.7px}
+.reportCover h2{margin:0 0 22px;font-size:clamp(22px,3vw,30px);line-height:1.2;letter-spacing:-.5px;color:#1f2822;max-width:760px}
+.reportMeta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;border-top:1px solid rgba(31,40,34,.18);padding-top:18px}
+.reportMeta div{display:grid;gap:6px}
+.reportMeta span{font-size:8px;letter-spacing:1.2px;color:#68746b}
+.reportMeta b{font-size:12px;color:#26362b;font-weight:650}
+.reportActions{display:flex;gap:8px;margin-top:22px}
+.reportStatus{padding:12px 32px;background:#f0f5f0;border-bottom:1px solid #e0e7e0;font-size:11px;line-height:1.6;color:#47634f}
+.reportDoc>section{padding:22px 32px;border-bottom:1px solid rgba(255,255,255,.065)}
+.reportDoc h3{margin:0 0 11px;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;color:#54d392}
+.reportDoc p,.reportDoc li{font-size:12px;line-height:1.8;color:#c9dbd2;margin:0}
+.reportDoc section>p{max-width:900px}
+.reportDoc ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.reportDoc li{display:flex;align-items:flex-start;gap:10px}
+.reportChips{padding:18px 32px;display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid rgba(255,255,255,.065)}
+.reportChips i{font-style:normal;padding:7px 11px;border-radius:7px;background:#0b3021;color:#9be6ba;font-size:10px;border:1px solid rgba(86,210,142,.14)}
+.reportCat{padding:13px 15px;border-left:3px solid #1fa86c;background:rgba(255,255,255,.025);border-radius:0 9px 9px 0;margin-bottom:10px}
+.reportCat b{display:block;margin-bottom:5px;color:#e5f1eb;font-size:12px}
+.reportCat p{white-space:pre-line}
+.reportNextSteps li{padding:10px 12px;background:rgba(255,255,255,.025);border-radius:8px}
+.actionIndex{display:inline-flex;flex:0 0 26px;height:26px;align-items:center;justify-content:center;border-radius:7px;background:#123d2a;color:#78dda4;font-size:10px;font-weight:800}
+.reportFooter{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 32px;background:rgba(0,0,0,.12);color:#86a897}
+.reportFooter div{display:grid;gap:4px}
+.reportFooter b{font-size:10px;color:#b6d6c3}
+.reportFooter span{font-size:9px}
+.light .reportDoc{background:#fff;border-color:#dce9e2;color:#20382c}
+.light .reportCover{background:linear-gradient(135deg,#edf8f1,#dcefe4);border-color:#d2e8da}
+.light .reportBrand strong,.light .reportCover h2,.light .reportMeta b{color:#173a29}
+.light .reportBrand span,.light .reportMeta span{color:#557866}
+.light .reportStatus{background:#f0f8f3;color:#3f7356;border-color:#e1eee5}
+.light .reportDoc p,.light .reportDoc li{color:#20382c}
+.light .reportDoc h3{color:#167548}
+.light .reportCat{background:#f7fbf8}
+.light .reportCat b{color:#173a29}
+.light .reportFooter{background:#f5faf7;color:#557866}
+.light .reportFooter b{color:#234b35}
+.notice.warn{background:#2b2410;color:#e7c46a;border-color:rgba(231,196,106,.2)}
+@media(max-width:1000px){.reportsLayout{grid-template-columns:1fr}.relatoriosPage .demandToolbar{grid-template-columns:1fr 1fr}.relatoriosPage .demandToolbar>span{display:none}}
+@media(max-width:650px){.periodBox{grid-template-columns:1fr}.reportCover{padding:22px 18px}.reportBrand{margin-bottom:24px}.reportCoverLabel{right:18px;top:28px;font-size:7px}.reportMeta{grid-template-columns:1fr;gap:10px}.reportMeta div{grid-template-columns:120px 1fr;align-items:center}.reportStatus{padding:12px 18px}.reportDoc>section,.reportChips{padding:18px}.reportFooter{padding:16px 18px}}
+@page{size:A4;margin:16mm 15mm}
+@media print{
+ body *{visibility:hidden!important}
+ .reportDoc,.reportDoc *{visibility:visible!important}
+ .reportDoc{position:absolute;left:0;top:0;width:100%;overflow:visible;background:#fff!important;color:#17251d!important;border:0;border-radius:0;box-shadow:none}
+ .reportCover{background:#edf7f0!important;border-bottom:2px solid #2b8d5b;print-color-adjust:exact;-webkit-print-color-adjust:exact;padding:22px 24px}
+ .reportBrand img{width:150px;height:auto;max-height:62px}
+ .reportBrand strong,.reportCover h2,.reportMeta b{color:#173a29!important}
+ .reportBrand span,.reportMeta span{color:#557866!important}
+ .reportCover h2{font-size:24px;margin-bottom:16px}
+ .reportStatus{background:#f0f8f3!important;color:#3f7356!important;padding:10px 24px}
+ .reportDoc>section{padding:16px 24px;break-inside:avoid;border-color:#e4ece7}
+ .reportChips{padding:12px 24px;border-color:#e4ece7}
+ .reportDoc p,.reportDoc li,.reportCat p{color:#253b2e!important}
+ .reportDoc h3{color:#0b6b42!important}
+ .reportCat{background:#f7fbf8!important;border-color:#2b8d5b;break-inside:avoid}
+ .reportCat b{color:#173a29!important}
+ .reportFooter{background:#f5faf7!important;color:#557866!important;padding:14px 24px;break-inside:avoid}
+ .reportFooter b{color:#234b35!important}
+ .reportChips i{background:#eef8f1!important;color:#17623d!important;border-color:#d8ebde!important}
+ .noPrint{display:none!important}
+}
