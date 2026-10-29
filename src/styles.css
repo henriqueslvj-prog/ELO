@@ -285,3 +285,44 @@
 .light .solutionItem,.light .reportRecords ul{background:#f7faf8;border-color:#dce9e2}.light .reportRecords li{border-color:#e5eee9;color:#30483c}
 @media(max-width:700px){.reportBuilder .obsPick{grid-template-columns:20px minmax(0,1fr);}.reportBuilder .obsPick .obsPickDate{grid-column:2}.reportBuilder .obsPick .obsPickText{grid-column:2}.reportBuilder .obsPick .priorityPill{grid-column:2;justify-self:start}.reportRecords li{grid-template-columns:70px minmax(0,1fr)}.reportRecords li i{grid-column:2}.reportRecords li span:last-child{grid-column:1/-1}}
 @media print{.solutionItem,.reportRecords ul{background:#fff!important;border-color:#d5ded9!important}.solutionHead b,.solutionNote,.reportRecords li,.reportRecords li span{color:#17251d!important}.reportRecords li i{color:#0b6b42!important}}
+/* ===== V0.18.0 — Relatórios: categorias, histórico, versões, demandas e painel ===== */
+.reportRow{grid-template-columns:minmax(200px,1fr) 110px 104px}
+.reportRow small{white-space:normal}
+.reportFilters{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06)}
+.reportFilters .search{flex:1 1 180px;min-width:150px}
+.reportFilters .filterSelect{height:40px;min-width:130px}
+.dateFilter{display:grid;gap:4px;color:#7e988c;font-size:9px;font-weight:700}
+.dateFilter input{height:40px;border:1px solid rgba(255,255,255,.08);border-radius:11px;background:#0a1b14;color:#e5f1eb;padding:0 10px;font:600 11px Inter,sans-serif;color-scheme:dark}
+.loadMore{margin:12px auto;display:block}
+.catAdd{display:flex;gap:10px;flex-wrap:wrap}
+.catAdd input{flex:1 1 220px}
+.catList{display:grid;border:1px solid rgba(255,255,255,.07);border-radius:14px;overflow:hidden}
+.catRow{display:grid;grid-template-columns:minmax(140px,1fr) 150px auto;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;color:#e5f1eb}
+.catRow:last-child{border-bottom:0}
+.catRow.off{opacity:.55}
+.catRow input{height:38px!important}
+.catRow small{color:#7e988c;font-size:10px}
+.catActions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.catActions .filter{height:32px;padding:0 11px;font-size:10px}
+.solutionItem li{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.solutionItem li span{flex:1;min-width:200px}
+.demandBtn{border:1px solid rgba(76,215,153,.35);background:rgba(14,48,34,.55);color:#58d99e;border-radius:8px;height:26px;padding:0 10px;font:700 10px Inter,sans-serif;cursor:pointer;white-space:nowrap}
+.demandBtn:hover{background:#0d3525}
+.demandBadge{font-style:normal;font-size:10px;font-weight:700;color:#58d99e;background:rgba(14,48,34,.55);border-radius:8px;padding:5px 9px;white-space:nowrap}
+.versionList{display:grid;gap:10px;max-height:60vh;overflow:auto;padding:4px 2px}
+.versionItem{display:flex;gap:14px;justify-content:space-between;align-items:flex-start;padding:14px 16px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(8,24,17,.7)}
+.versionItem b{display:block;font-size:12px;color:#e5f1eb}
+.versionItem small{display:block;margin-top:3px;color:#7e988c;font-size:10px}
+.versionItem p{margin:8px 0 4px;font-size:11px;line-height:1.55;color:#b7cbc1}
+.versionItem .filter{flex:none}
+.execReportPanel{margin-top:0}
+.execMiniGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.execMini{padding:15px 16px;border:1px solid rgba(255,255,255,.065);border-radius:14px;background:rgba(8,24,17,.7)}
+.execMini strong{display:block;font-size:26px;color:#58d99e;line-height:1.1;margin-bottom:6px}
+.execMini b{display:block;font-size:11px;color:#e5f1eb}
+.execMini small{display:block;margin-top:3px;font-size:9.5px;color:#7e988c;line-height:1.45}
+.light .dateFilter input,.light .versionItem,.light .execMini{background:#fff;border-color:#dce9e2;color:#20382c;color-scheme:light}
+.light .catRow,.light .versionItem b,.light .execMini b{color:#20382c}.light .versionItem p{color:#4a6357}.light .catList{border-color:#dce9e2}.light .catRow{border-color:#e5eee9}
+@media(max-width:900px){.execMiniGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.catRow{grid-template-columns:1fr}.catActions{justify-content:flex-start}}
+@media(max-width:560px){.execMiniGrid{grid-template-columns:1fr}.versionItem{flex-direction:column}}
+@media print{.demandBtn,.demandBadge{display:none!important}}
