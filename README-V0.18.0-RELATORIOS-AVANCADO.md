@@ -18,3 +18,7 @@
 - Relatórios gerados antes desta versão continuam funcionando; o PDF usa os dados já salvos neles.
 - Renomear categoria não altera o texto de relatórios já gerados (são registros históricos).
 - O PDF usa fontes padrão (Helvetica): caracteres fora do alfabeto latino são omitidos.
+
+## V0.18.2
+- Capa do PDF refeita conforme o modelo do Grupo System Saúde: fundo cinza com as ondas originais, logo transparente (sem caixa branca), título em caixa escura com borda dourada e faixa do período. As imagens foram extraídas do PDF modelo e estão embutidas em `report-pdf/index.ts` (arquivo único, ~150 KB).
+- Logo transparente também no cabeçalho das demais páginas.
