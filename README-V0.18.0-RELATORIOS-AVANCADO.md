@@ -10,7 +10,7 @@
 
 ## Publicação (nesta ordem)
 1. SQL Editor do Supabase: execute `supabase/relatorios-v0170-categorias-versoes-demandas.sql` (seguro para repetir; não apaga dados).
-2. Edge Functions: faça o deploy da **nova** função `report-pdf` (pasta inteira: `index.ts`, `logo.ts`, `deno.json`). Se `generate-report` ainda não estiver na V0.17, publique-a também.
+2. Edge Functions: faça o deploy da **nova** função `report-pdf` (arquivo único `index.ts`, com a logo embutida; pode ser colado direto no editor do painel). Se `generate-report` ainda não estiver na V0.17, publique-a também.
 3. Envie o frontend ao GitHub (Vercel).
 4. Permissões: `relatorios/create` cria demandas a partir de soluções, duplica relatórios e gera PDF/relatórios; `relatorios/edit` gerencia categorias e restaura versões. Criar demanda também exige `demandas/create`.
 
