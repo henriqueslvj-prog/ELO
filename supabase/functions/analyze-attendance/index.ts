@@ -286,6 +286,8 @@ const syncMonthlyAiScores = async (supabase: any, attendance: any, criteria: any
   if (monthlyScoreError) throw new Error(`Não foi possível salvar as médias mensais de qualidade/script: ${monthlyScoreError.message}`);
 
   for (const criterion of criteria) {
+    // Qualidade e Script são consolidados no banco (_sync_destaque_ai_scores) a partir das médias 0–100 e 0–10.
+    if (/qualidade do atendimento|utiliza[cç][aã]o do script|script e processos/i.test(String(criterion.name || ''))) continue;
     const values: number[] = [];
     for (const item of analyzedAttendances || []) {
       const criterionResult = item?.analysis?.criterios?.find((x: any) =>
