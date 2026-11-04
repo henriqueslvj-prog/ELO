@@ -121,8 +121,6 @@ const buildPdf = async (report: any, author: { name: string; role: string } | nu
     wrap(report.title, bold, 12, bw).slice(0, 3).forEach((ln, i) => cover.drawText(ln, { x: (W - bold.widthOfTextAtSize(ln, 12)) / 2, y: gy - 30 - i * 16, size: 12, font: bold, color: rgb(0.1412, 0.1686, 0.1961) }));
   }
   const issued = new Date();
-  const issuedText = clean(`Emitido em ${issued.getUTCDate()} de ${MONTHS[issued.getUTCMonth()]} de ${issued.getUTCFullYear()}  •  ${report.observation_count} observações analisadas`);
-  cover.drawText(issuedText, { x: (W - font.widthOfTextAtSize(issuedText, 9)) / 2, y: 44, size: 9, font, color: rgb(0.2, 0.23, 0.25) });
 
   // ---------- BLOCOS DE TEXTO ----------
   let sectionNo = 0;
@@ -267,8 +265,7 @@ const buildPdf = async (report: any, author: { name: string; role: string } | nu
   // Fechamento e assinatura
   ensure(150);
   y -= 16;
-  para(`Relatório emitido em ${issued.getUTCDate()} de ${MONTHS[issued.getUTCMonth()]} de ${issued.getUTCFullYear()}.`, { gap: 2 });
-  para('Relatório elaborado pelo sistema ELO — Grupo System Saúde.', { gap: 28 });
+  para(`Relatório emitido em ${issued.getUTCDate()} de ${MONTHS[issued.getUTCMonth()]} de ${issued.getUTCFullYear()}.`, { gap: 30 });
   const sigW = 230, sx = ML + (CW - sigW) / 2;
   page.drawLine({ start: { x: sx, y }, end: { x: sx + sigW, y }, thickness: 0.8, color: INK });
   y -= 14;
