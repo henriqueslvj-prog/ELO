@@ -160,59 +160,14 @@ const buildPdf = async (report: any, author: { name: string; role: string } | nu
   para(c.resumo_executivo || 'Sem resumo.');
   if (c.aviso) para(`Aviso: ${c.aviso}`, { size: 9, f: italic, color: MUTED });
 
-  // Tabela de categorias
-  const counts: Record<string, number> = c.contagem_por_categoria || {};
-  const entries = Object.entries(counts).sort((a, b) => Number(b[1]) - Number(a[1]));
-  const total = entries.reduce((s, [, v]) => s + Number(v), 0);
-  if (entries.length) {
-    ensure(60 + entries.length * 24);
-    para('TABELA 1 – OBSERVAÇÕES POR CATEGORIA', { size: 9, f: bold, color: INK, gap: 6 });
-    const cols = [CW * 0.5, CW * 0.25, CW * 0.25];
-    const row = (cells: string[], head: boolean, fill: any) => {
-      ensure(24);
-      let x = ML;
-      cells.forEach((cell, i) => {
-        page.drawRectangle({ x, y: y - 22, width: cols[i] - 3, height: 22, color: fill, borderColor: head ? INK : LINE, borderWidth: 0.6 });
-        const f = head ? bold : font, sz = head ? 8.5 : 9.5;
-        const txt = clean(cell);
-        const tw = f.widthOfTextAtSize(txt, sz);
-        page.drawText(txt, { x: i === 0 ? x + 8 : x + (cols[i] - 3 - tw) / 2, y: y - 15, size: sz, font: f, color: head ? rgb(1, 1, 1) : TEXT });
-        x += cols[i];
-      });
-      y -= 24;
-    };
-    row(['CATEGORIA', 'OBSERVAÇÕES', 'PARTICIPAÇÃO'], true, INK);
-    entries.forEach(([k, v]) => row([k, String(v), `${total ? Math.round((Number(v) / total) * 100) : 0}%`], false, SOFT));
-    row(['TOTAL', String(total), '100%'], true, INK);
-    y -= 8;
-
-    // Gráfico de barras
-    const rowH = 22;
-    ensure(40 + entries.length * rowH);
-    para('GRÁFICO 1 – DISTRIBUIÇÃO DAS OBSERVAÇÕES POR CATEGORIA', { size: 9, f: bold, color: INK, gap: 8 });
-    const max = Math.max(...entries.map(([, v]) => Number(v)), 1);
-    const labelW = 120, barMax = CW - labelW - 70;
-    entries.forEach(([k, v]) => {
-      ensure(rowH);
-      const lab = wrap(k, font, 9, labelW - 8)[0] || '';
-      page.drawText(lab, { x: ML, y: y - 13, size: 9, font, color: TEXT });
-      const w = Math.max(3, (Number(v) / max) * barMax);
-      page.drawRectangle({ x: ML + labelW, y: y - 17, width: w, height: 14, color: GREEN });
-      page.drawText(clean(`${v} (${total ? Math.round((Number(v) / total) * 100) : 0}%)`), { x: ML + labelW + w + 6, y: y - 13, size: 9, font: bold, color: INK });
-      y -= rowH;
-    });
-    y -= 6;
-  }
-
   if (c.destaques?.length) { section('DESTAQUES DO PERÍODO'); bullets(c.destaques); }
   if (c.pontos_de_atencao?.length) { section('PONTOS DE ATENÇÃO'); bullets(c.pontos_de_atencao); }
 
   if (c.solucoes?.length) {
     section('POSSÍVEIS SOLUÇÕES');
-    para('Sugestões elaboradas por IA a partir dos problemas registrados nas observações. Devem ser validadas pela gestão antes da aplicação.', { size: 9, f: italic, color: MUTED, gap: 8 });
     for (const s of c.solucoes) {
       const head = wrap(`${s.problema}`, bold, 10.5, CW - 110);
-      ensure(30 + head.length * 15);
+      ensure(64 + head.length * 15);
       page.drawRectangle({ x: ML, y: y - 3 - head.length * 15, width: 3, height: head.length * 15 + 3, color: GOLD });
       head.forEach((ln, i) => page.drawText(ln, { x: ML + 10, y: y - 11 - i * 15, size: 10.5, font: bold, color: INK }));
       if (s.prioridade) {
@@ -244,22 +199,6 @@ const buildPdf = async (report: any, author: { name: string; role: string } | nu
       y -= 3;
     });
     y -= 4;
-  }
-
-  if (c.observacoes_incluidas?.length) {
-    section(`REGISTROS CONSIDERADOS (${c.observacoes_incluidas.length})`);
-    const cw = [64, 92, CW - 156];
-    for (const o of c.observacoes_incluidas) {
-      const tl = wrap(o.titulo || '', font, 9, cw[2] - 6);
-      const h = Math.max(1, tl.length) * 12 + 8;
-      ensure(h);
-      page.drawText(clean(br(o.data)), { x: ML, y: y - 11, size: 9, font, color: MUTED });
-      page.drawText(clean(wrap(o.categoria || '', bold, 9, cw[1] - 6)[0] || ''), { x: ML + cw[0], y: y - 11, size: 9, font: bold, color: GREEN });
-      tl.forEach((ln, i) => page.drawText(ln, { x: ML + cw[0] + cw[1], y: y - 11 - i * 12, size: 9, font, color: TEXT }));
-      y -= h;
-      page.drawLine({ start: { x: ML, y: y + 2 }, end: { x: W - MR, y: y + 2 }, thickness: 0.4, color: LINE });
-    }
-    y -= 8;
   }
 
   // Fechamento e assinatura

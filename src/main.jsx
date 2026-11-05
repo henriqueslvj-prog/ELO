@@ -150,9 +150,9 @@ function Dashboard({currentUser}){
  useEffect(()=>{let active=true;(async()=>{
   setLoading(true);
   if(!supabase){if(active){setWarnings(['Supabase não configurado']);setLoading(false)}return}
-  const warn=[];
-  const rows=async(label,q)=>{try{const r=await q;if(r.error){warn.push(label);return null}return r.data||[]}catch{warn.push(label);return null}};
-  const cnt=async(label,q)=>{try{const r=await q;if(r.error){warn.push(label);return null}return r.count??0}catch{warn.push(label);return null}};
+  const warn=[];const errs={};
+  const rows=async(label,q)=>{try{const r=await q;if(r.error){warn.push(label);errs[label]=r.error.message;return null}return r.data||[]}catch(e){warn.push(label);errs[label]=String(e?.message||e);return null}};
+  const cnt=async(label,q)=>{try{const r=await q;if(r.error){warn.push(label);errs[label]=r.error.message;return null}return r.count??0}catch(e){warn.push(label);errs[label]=String(e?.message||e);return null}};
   const now=new Date();const pd=n=>String(n).padStart(2,'0');
   const key=dt=>`${dt.getFullYear()}-${pd(dt.getMonth()+1)}-${pd(dt.getDate())}`;
   const todayKey=key(now);const monthStart=`${now.getFullYear()}-${pd(now.getMonth()+1)}-01`;const key7=key(new Date(now.getTime()+7*86400000));
@@ -175,7 +175,7 @@ function Dashboard({currentUser}){
   if(sol){const byStatus={};sol.forEach(x=>{byStatus[x.status]=(byStatus[x.status]||0)+1});Object.assign(out,{solTotal:sol.length,solPending:sol.filter(x=>['nova','em_analise'].includes(x.status)).length,solByStatus:byStatus})}
   if(reu){const up=reu.filter(m=>m.status==='agendada'&&new Date(m.meeting_date)>=now);Object.assign(out,{meetings:up.slice(0,5),meetings7:up.filter(m=>new Date(m.meeting_date)<=new Date(now.getTime()+7*86400000)).length,meetingsDone:reu.filter(m=>m.status==='realizada').length})}
   if(rank){const first=rank[0]?.period_key;const top=rank.filter(r=>r.period_key===first&&r.final_score!==null&&r.final_score!==undefined);Object.assign(out,{rankPeriod:first||null,rankTop:top.slice(0,5),rankAvg:top.length?top.reduce((s,r)=>s+Number(r.final_score),0)/top.length:null,rankCount:top.length})}
-  out.obsMes=obsMes;out.relMes=relMes;
+  out.obsMes=obsMes;out.relMes=relMes;out.errs=errs;
   if(links){out.demReports=links.filter(l=>l.demanda_id&&l.demandas&&!CLOSED.includes(l.demandas.status)).length;
    if(reps){const done=new Set(links.filter(l=>l.demanda_id).map(l=>`${l.report_id}\u0001${l.problema}\u0001${l.solucao}`));let n=0;reps.forEach(r=>(Array.isArray(r.solucoes)?r.solucoes:[]).forEach(x=>(x.solucoes||[]).forEach(y=>{if(!done.has(`${r.id}\u0001${x.problema}\u0001${y}`))n++})));out.noDemand=n}}
   if(active){setD(out);setWarnings([...new Set(warn)]);setLastUpdated(new Date());setLoading(false)}
@@ -183,7 +183,7 @@ function Dashboard({currentUser}){
  const x=d||{};
  const hour=new Date().getHours();const greet=hour<12?'Bom dia':hour<18?'Boa tarde':'Boa noite';
  const first=String(currentUser?.full_name||'').trim().split(' ')[0]||'';
- const today=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ const today0=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});const today=today0.charAt(0).toUpperCase()+today0.slice(1);
  const mkItems=(map,keys)=>map?keys.filter(k=>map[k]).map(k=>({key:k,label:STATUS[k],count:map[k],tone:TONE[k]})):null;
  const demItems=mkItems(x.byStatus,['nova','em_analise','em_andamento','aguardando','concluida','cancelada']);
  const solItems=mkItems(x.solByStatus,['nova','em_analise','aprovada','recusada','demanda_gerada']);
@@ -204,25 +204,25 @@ function Dashboard({currentUser}){
   {n:x.relMes,t:'Relatórios no mês',s:`${fmt(x.obsMes)} observações registradas`,icon:'relatorios'}
  ];
  const Panel=({title,subtitle,children,wide})=><div className={'dxPanel'+(wide?' wide':'')}><div className="dxPanelHead"><div><h3>{title}</h3>{subtitle&&<span>{subtitle}</span>}</div></div>{children}</div>;
- const Bars=({items,empty})=>items===null||items===undefined?<div className="dxEmpty">{loading?'Carregando…':'Fonte indisponível ou sem permissão de leitura.'}</div>:!items.length?<div className="dxEmpty">{empty||'Sem registros.'}</div>:<div className="dxBars">{items.map(i=>{const tot=items.reduce((s,v)=>s+v.count,0);return <div className="dxBar" key={i.key}><div className="dxBarHead"><span>{i.label}</span><b>{fmt(i.count)}<small>{pct(i.count,tot)}%</small></b></div><div className="dxTrack"><i className={'tone-'+(i.tone||'accent')} style={{width:Math.max(3,pct(i.count,tot))+'%'}}/></div></div>})}</div>;
+ const Bars=({items,empty,err})=>items===null||items===undefined?<div className="dxEmpty">{loading?'Carregando…':(err?`Não foi possível carregar: ${err}`:'Fonte indisponível ou sem permissão de leitura.')}</div>:!items.length?<div className="dxEmpty">{empty||'Sem registros.'}</div>:<div className="dxBars">{items.map(i=>{const tot=items.reduce((s,v)=>s+v.count,0);return <div className="dxBar" key={i.key}><div className="dxBarHead"><span>{i.label}</span><b>{fmt(i.count)}<small>{pct(i.count,tot)}%</small></b></div><div className="dxTrack"><i className={'tone-'+(i.tone||'accent')} style={{width:Math.max(3,pct(i.count,tot))+'%'}}/></div></div>})}</div>;
  const daysLate=due=>Math.max(1,Math.floor((Date.parse(x.todayKey)-Date.parse(due))/86400000));
  const overduePanel=<Panel title="Demandas vencidas" subtitle="Mais antigas primeiro">{!x.overdueList?<div className="dxEmpty">{loading?'Carregando…':'Fonte indisponível.'}</div>:!x.overdueList.length?<div className="dxEmpty ok">Nenhuma demanda vencida. Operação em dia.</div>:<ul className="dxList">{x.overdueList.map(m=><li key={m.id}><div><b>{m.title}</b><small>Prazo {brd(m.due_date)} · {PRIO[m.priority]||m.priority}</small></div><em className="dxChip bad">{daysLate(m.due_date)} dia(s)</em></li>)}</ul>}</Panel>;
  const meetingsPanel=<Panel title="Próximas reuniões" subtitle="Agendadas a partir de agora">{!x.meetings?<div className="dxEmpty">{loading?'Carregando…':'Fonte indisponível.'}</div>:!x.meetings.length?<div className="dxEmpty">Nenhuma reunião agendada.</div>:<ul className="dxList">{x.meetings.map(m=><li key={m.id}><div><b>{m.title}</b><small>{m.participants||'Sem participantes informados'}</small></div><em className="dxChip">{new Date(m.meeting_date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</em></li>)}</ul>}</Panel>;
  const rankPanel=<Panel title="Destaque do mês" subtitle={x.rankPeriod?`Ranking de ${x.rankPeriod.split('-').reverse().join('/')} · pontuação IA + gestor`:'Ranking de pontuação'}>{!x.rankTop?<div className="dxEmpty">{loading?'Carregando…':'Fonte indisponível ou sem permissão de leitura.'}</div>:!x.rankTop.length?<div className="dxEmpty">Nenhuma pontuação lançada ainda.</div>:<ol className="dxRank">{x.rankTop.map(r=>{const mx=Number(r.max_points||100);return <li key={r.full_name+r.position}><span className={'dxPos p'+Math.min(Number(r.position),4)}>{r.position}</span><div><div className="dxRankTop"><b>{r.full_name}</b><strong>{Number(r.final_score).toFixed(1)}<small> / {mx}</small></strong></div><div className="dxTrack"><i className="tone-ok" style={{width:Math.min(100,pct(Number(r.final_score),mx))+'%'}}/></div>{!r.complete&&<small className="dxHint">Pontuação parcial</small>}</div></li>})}</ol>}</Panel>;
  const reportPanel=<Panel title="Relatórios e problemas em aberto" subtitle="Observações do mês e acompanhamento das soluções sugeridas"><div className="dxMiniGrid">{[{n:x.obsMes,t:'Observações no mês'},{n:x.relMes,t:'Relatórios gerados no mês'},{n:x.demReports,t:'Problemas em acompanhamento',h:'Demandas de relatórios abertas'},{n:x.noDemand,t:'Soluções sem demanda',h:'Últimos 90 dias'}].map(m=><div className="dxMini" key={m.t}><strong>{loading?'…':fmt(m.n)}</strong><b>{m.t}</b>{m.h&&<small>{m.h}</small>}</div>)}</div></Panel>;
  return <section className="dxDash">
-  <div className="dxToolbar"><div><span className="dxDate">{today}</span><h2>{greet}{first?`, ${first}`:''}</h2><p>{loading?'Consolidando as informações…':x.open===undefined?'Resumo da operação, das pessoas e dos resultados.':`${fmt(x.open)} demanda(s) em aberto${x.overdue?` e ${fmt(x.overdue)} vencida(s)`:''}. ${fmt(x.solPending)} solicitação(ões) aguardando tratamento.`}</p></div>
+  <div className="dxToolbar"><div><span className="dxDate">{today}</span><h2>{greet}{first?`, ${first}`:''}</h2><p>{loading?'Consolidando as informações…':(()=>{const parts=[];if(x.open!==undefined)parts.push(`${fmt(x.open)} demanda(s) em aberto${x.overdue?` e ${fmt(x.overdue)} vencida(s)`:''}`);if(x.solPending!==undefined&&x.solPending!==null)parts.push(`${fmt(x.solPending)} solicitação(ões) aguardando tratamento`);return parts.length?parts.join('. ')+'.':'Resumo da operação, das pessoas e dos resultados.'})()}</p></div>
    <div className="dxTools"><div className="dxSeg" role="tablist"><button className={view==='estrategica'?'active':''} onClick={()=>setView('estrategica')}>Visão estratégica</button><button className={view==='operacao'?'active':''} onClick={()=>setView('operacao')}>Controle operacional</button></div><button className="dxRefresh" onClick={()=>setRefresh(v=>v+1)} disabled={loading} title="Atualizar dados"><Ico name="refresh" size={16}/><span>{loading?'Atualizando…':'Atualizar'}</span></button></div></div>
   <div className="dxKpis">{kpis.map(k=><div className={'dxKpi '+(k.tone||'')} key={k.t}><div className="dxKpiTop"><span className="dxKpiIcon"><Ico name={k.icon} size={18}/></span></div><strong>{loading?'…':fmt(k.n)}{k.n!==null&&k.n!==undefined&&!loading?k.suffix||'':''}</strong><b>{k.t}</b><small>{k.s}</small></div>)}</div>
   {view==='operacao'?<>
    <div className="dxGrid">{overduePanel}{meetingsPanel}</div>
-   <div className="dxGrid"><Panel title="Demandas abertas por prioridade" subtitle="Distribuição do que está em andamento"><Bars items={prioItems} empty="Nenhuma demanda aberta."/></Panel><Panel title="Solicitações por status" subtitle="Fluxo de entrada de pedidos"><Bars items={solItems}/></Panel></div>
+   <div className="dxGrid"><Panel title="Demandas abertas por prioridade" subtitle="Distribuição do que está em andamento"><Bars items={prioItems} empty="Nenhuma demanda aberta."/></Panel><Panel title="Solicitações por status" subtitle="Fluxo de entrada de pedidos"><Bars items={solItems} err={x.errs?.['Solicitações']}/></Panel></div>
    {reportPanel}
   </>:<>
-   <div className="dxGrid"><Panel title="Demandas por status" subtitle="Distribuição de todos os registros"><Bars items={demItems}/></Panel>{rankPanel}</div>
-   <div className="dxGrid"><Panel title="Solicitações por status" subtitle="Fluxo de entrada de pedidos"><Bars items={solItems}/></Panel>{reportPanel}</div>
+   <div className="dxGrid"><Panel title="Demandas por status" subtitle="Distribuição de todos os registros"><Bars items={demItems} err={x.errs?.['Demandas']}/></Panel>{rankPanel}</div>
+   <div className="dxGrid"><Panel title="Solicitações por status" subtitle="Fluxo de entrada de pedidos"><Bars items={solItems} err={x.errs?.['Solicitações']}/></Panel>{reportPanel}</div>
   </>}
-  {warnings.length>0&&<div className="dxWarn"><Ico name="alert" size={16}/><span><b>Verifique as fontes:</b> {warnings.join(' • ')}. A indisponibilidade não é interpretada como zero.</span></div>}
+  {warnings.length>0&&<div className="dxWarn"><Ico name="alert" size={16}/><span><b>Verifique as fontes:</b> {Object.keys(x.errs||{}).length?Object.entries(x.errs).map(([k,v])=>`${k} (${v})`).join(' • '):warnings.join(' • ')}. A indisponibilidade não é interpretada como zero.</span></div>}
   <div className="dxFooter"><span>{lastUpdated?`Atualizado às ${lastUpdated.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`:'Aguardando a primeira consulta'}</span><span>Dados lidos diretamente do Supabase.</span></div>
  </section>
 }
