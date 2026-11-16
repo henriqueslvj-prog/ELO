@@ -1,14 +1,13 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import {createClient} from '@supabase/supabase-js';
+import {supabase} from './supabaseClient.js';
+import {Ico} from './ico.jsx';
+import {PasswordMeter,passwordProblem,lockRemaining,registerFailure,clearGuard,takeNotice,setNotice as storeNotice,readFnError,useIdleLogout,IdleWarning,MfaChallenge,useMfaStatus,LegalModal,TermsGate,SecurityCenter} from './security.jsx';
 import './styles.css';
 import logo from './assets/elo-logo.png';
 import mark from './assets/elo-mark.png';
 import grupoSystemLogo from './assets/grupo-system-logo.png';
 
-const SUPABASE_URL=import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY=import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase=(SUPABASE_URL&&SUPABASE_ANON_KEY)?createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
 const NAV=[
  {group:'Visão geral',items:[['dashboard','Painel Executivo']]},
  {group:'Operação',items:[['demandas','Demandas'],['solicitacoes','Solicitações'],['reunioes','Reuniões']]},
@@ -26,53 +25,27 @@ const PAGE_INFO={
 const ROLE_LABEL={administrador:'Administrador',gestor:'Gestor',supervisor:'Supervisor',supervisora:'Supervisora',colaborador:'Colaborador'};
 
 function Icon({children}){return <span className="icon">{children}</span>}
-function Ico({name,size=18}){
- const P={
-  dashboard:<><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></>,
-  demandas:<><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></>,
-  solicitacoes:<><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></>,
-  destaques:<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
-  reunioes:<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-  relatorios:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>,
-  usuarios:<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
-  logout:<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
-  sun:<><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></>,
-  moon:<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/>,
-  refresh:<><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></>,
-  menu:<><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></>,
-  search:<><circle cx="11" cy="11" r="7.5"/><line x1="21" y1="21" x2="16.7" y2="16.7"/></>,
-  download:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
-  share:<><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></>,
-  wifioff:<><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></>,
-  panelClose:<><rect x="3" y="3" width="18" height="18" rx="2.5"/><line x1="9" y1="3" x2="9" y2="21"/><path d="m16 15-3-3 3-3"/></>,
-  panelOpen:<><rect x="3" y="3" width="18" height="18" rx="2.5"/><line x1="9" y1="3" x2="9" y2="21"/><path d="m14 9 3 3-3 3"/></>,
-  pin:<><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></>,
-  activity:<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>,
-  close:<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
-  alert:<><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
-  clock:<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
-  check:<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>,
-  trend:<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>,
-  calendar:<><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
-  file:<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
-  award:<><circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/></>
- };
- return <svg className="ico" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{P[name]||P.file}</svg>
-}
-function Login({onLogin}){
+function Login({onLogin,authError}){
  const [email,setEmail]=useState('');
  const [password,setPassword]=useState('');
  const [loading,setLoading]=useState(false);
  const [error,setError]=useState('');
  const [notice,setNotice]=useState('');
  const [mode,setMode]=useState('login');
+ const [lock,setLock]=useState(lockRemaining());
+ const [legal,setLegal]=useState(null);
+ useEffect(()=>{const n=takeNotice();if(n)setNotice(n)},[]);
+ useEffect(()=>{if(authError)setError(authError)},[authError]);
+ useEffect(()=>{if(lock<=0)return;const t=setInterval(()=>setLock(lockRemaining()),1000);return()=>clearInterval(t)},[lock>0]);
  const submit=async e=>{
    e.preventDefault();setError('');setNotice('');
    if(!supabase){setError('Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY antes de usar o login.');return}
+   const wait=lockRemaining();if(wait>0){setLock(wait);setError(`Muitas tentativas. Aguarde ${wait}s para tentar novamente.`);return}
    setLoading(true);
-   const {data,error}=await supabase.auth.signInWithPassword({email,password});
+   const {data,error}=await supabase.auth.signInWithPassword({email:email.trim(),password});
    setLoading(false);
-   if(error){setError('E-mail ou senha inválidos.');return}
+   if(error){const r=registerFailure();setLock(r);setError(r>0?`Muitas tentativas. Aguarde ${r}s para tentar novamente.`:'E-mail ou senha inválidos.');return}
+   clearGuard();
    const {data:profile,error:profileError}=await supabase.from('profiles').select('status').eq('id',data.user.id).single();
    if(profileError||!profile||profile.status!=='ativo'){await supabase.auth.signOut();setError('Seu acesso não está ativo. Procure o administrador do ELO.');return}
    onLogin(data.session)
@@ -88,7 +61,7 @@ function Login({onLogin}){
    if(error){setError('Não foi possível enviar o e-mail de recuperação. Verifique a configuração de URLs no Supabase e tente novamente.');return}
    setNotice('Se esse e-mail estiver cadastrado, você receberá um link para redefinir sua senha. Verifique também a caixa de spam.');
  };
- return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>{mode==='login'?'Acesso privado':'Recuperar senha'}</h1><p>{mode==='login'?'Entre com as credenciais fornecidas pelo administrador.':'Informe o e-mail vinculado à sua conta ELO para receber o link de recuperação.'}</p></div>{mode==='login'?<form onSubmit={submit}><label>E-mail<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username" placeholder="seu@email.com"/></label><label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••"/></label>{error&&<div className="errorBox">{error}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Entrando…':'Entrar no ELO'}</button><button type="button" className="textLink" onClick={()=>{setMode('recovery');setError('');setNotice('')}}>Esqueceu sua senha?</button></form>:<form onSubmit={sendReset}><label>E-mail cadastrado<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" placeholder="seu@email.com"/></label>{error&&<div className="errorBox">{error}</div>}{notice&&<div className="notice">{notice}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Enviando…':'Enviar link de recuperação'}</button><button type="button" className="textLink" onClick={()=>{setMode('login');setError('');setNotice('')}}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.</p></div></div>}
+ return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>{mode==='login'?'Acesso privado':'Recuperar senha'}</h1><p>{mode==='login'?'Entre com as credenciais fornecidas pelo administrador.':'Informe o e-mail vinculado à sua conta ELO para receber o link de recuperação.'}</p></div>{mode==='login'?<form onSubmit={submit}><label>E-mail<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username" placeholder="seu@email.com"/></label><label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••"/></label>{error&&<div className="errorBox">{error}</div>}{notice&&<div className="notice">{notice}</div>}<button className="primary loginButton" disabled={loading||lock>0}>{loading?'Entrando…':lock>0?`Aguarde ${lock}s`:'Entrar no ELO'}</button><button type="button" className="textLink" onClick={()=>{setMode('recovery');setError('');setNotice('')}}>Esqueceu sua senha?</button></form>:<form onSubmit={sendReset}><label>E-mail cadastrado<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" placeholder="seu@email.com"/></label>{error&&<div className="errorBox">{error}</div>}{notice&&<div className="notice">{notice}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Enviando…':'Enviar link de recuperação'}</button><button type="button" className="textLink" onClick={()=>{setMode('login');setError('');setNotice('')}}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.<br/><button type="button" className="textLink inline" onClick={()=>setLegal('terms')}>Termos de Uso</button> · <button type="button" className="textLink inline" onClick={()=>setLegal('policy')}>Segurança e Privacidade</button></p></div>{legal&&<LegalModal initial={legal} onClose={()=>setLegal(null)}/>}</div>}
 function ResetPassword({onBack,hasSession}){
  const [password,setPassword]=useState('');
  const [confirm,setConfirm]=useState('');
@@ -97,7 +70,7 @@ function ResetPassword({onBack,hasSession}){
  const [success,setSuccess]=useState(false);
  const save=async e=>{
    e.preventDefault();setError('');
-   if(password.length<8){setError('A nova senha deve ter pelo menos 8 caracteres.');return}
+   {const pr=passwordProblem(password,{});if(pr){setError(pr);return}}
    if(password!==confirm){setError('As senhas não correspondem.');return}
    if(!supabase){setError('O serviço de autenticação não está configurado.');return}
    setLoading(true);
@@ -108,7 +81,7 @@ function ResetPassword({onBack,hasSession}){
    await supabase.auth.signOut();
    window.history.replaceState({},document.title,window.location.pathname);
  };
- return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>Nova senha</h1><p>Crie uma nova senha para recuperar o acesso à sua conta.</p></div>{!hasSession?<><div className="errorBox">Este link de recuperação é inválido ou expirou. Solicite um novo link na tela de login.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:success?<><div className="notice">Senha alterada com sucesso. Você já pode entrar no ELO com a nova senha.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:<form onSubmit={save}><label>Nova senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={8} autoComplete="new-password" placeholder="Mínimo de 8 caracteres"/></label><label>Confirmar nova senha<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} required minLength={8} autoComplete="new-password" placeholder="Digite a senha novamente"/></label>{error&&<div className="errorBox">{error}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Salvando…':'Salvar nova senha'}</button><button type="button" className="textLink" onClick={onBack}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.</p></div></div>}
+ return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>Nova senha</h1><p>Crie uma nova senha para recuperar o acesso à sua conta.</p></div>{!hasSession?<><div className="errorBox">Este link de recuperação é inválido ou expirou. Solicite um novo link na tela de login.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:success?<><div className="notice">Senha alterada com sucesso. Você já pode entrar no ELO com a nova senha.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:<form onSubmit={save}><label>Nova senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo de 10 caracteres"/></label><PasswordMeter password={password}/><label>Confirmar nova senha<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Digite a senha novamente"/></label>{error&&<div className="errorBox">{error}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Salvando…':'Salvar nova senha'}</button><button type="button" className="textLink" onClick={onBack}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.</p></div></div>}
 function useOnline(){
  const [on,setOn]=useState(typeof navigator==='undefined'?true:navigator.onLine);
  useEffect(()=>{const a=()=>setOn(true),b=()=>setOn(false);window.addEventListener('online',a);window.addEventListener('offline',b);return()=>{window.removeEventListener('online',a);window.removeEventListener('offline',b)}},[]);
@@ -209,6 +182,9 @@ function App({session,profile}){
  const [light,setLight]=useState(()=>{try{return localStorage.getItem('elo_theme')==='light'}catch{return false}});
  const [showUsers,setShowUsers]=useState(false);const [newRequestSignal,setNewRequestSignal]=useState(0);
  const [palette,setPalette]=useState(false);const [forceBanner,setForceBanner]=useState(false);
+ const [securityOpen,setSecurityOpen]=useState(false);const [legalOpen,setLegalOpen]=useState(null);
+ const mfa=useMfaStatus(true);
+ const roleKey=String(profile?.role||'').toLowerCase();const privileged=['administrador','gestor'].includes(roleKey);
  const install=useInstall();const online=useOnline();
  const title=nav.find(n=>n[0]===page)?.[1]||'Painel Executivo';const [eyebrow,desc]=PAGE_INFO[page]||['',''];
  const email=session?.user?.email||'Usuário';const displayName=profile?.full_name||email;const initials=(displayName[0]||'N').toUpperCase();
@@ -216,6 +192,7 @@ function App({session,profile}){
  const isMac=typeof navigator!=='undefined'&&/Mac|iPhone|iPad/i.test(navigator.platform||navigator.userAgent||'');
  const canInstall=!install.installed&&(install.canPrompt||install.isIos);
  const logout=async()=>{if(supabase)await supabase.auth.signOut()};
+ const idle=useIdleLogout({minutes:privileged?20:30,enabled:true,onTimeout:()=>{storeNotice('Sua sessão foi encerrada por inatividade.');if(supabase)supabase.auth.signOut()}});
  const go=id=>{setPage(id);setMenu(false);window.scrollTo({top:0})};
  const toggleTheme=()=>setLight(v=>!v);
  const togglePin=()=>{const v=!pinned;setPinned(v);setMenu(false);try{localStorage.setItem('elo_menu_pinned',v?'1':'0')}catch{}};
@@ -232,7 +209,7 @@ function App({session,profile}){
    <nav>{NAV.map(g=><div className="navGroup" key={g.group}><span className="navLabel">{g.group}</span>{g.items.map(([id,label])=><button key={id} className={page===id?'active':''} onClick={()=>go(id)} aria-current={page===id?'page':undefined}><Ico name={id} size={18}/><span>{label}</span></button>)}</div>)}</nav>
    <div className="drawerSpacer"/>
    <SidebarProgress refreshKey={page}/>
-   <div className="drawerBottom"><span className="navLabel">Conta</span>{canInstall&&<button onClick={doInstall}><Ico name="download" size={18}/><span>Instalar aplicativo</span></button>}<button onClick={()=>{setShowUsers(true);setMenu(false)}}><Ico name="usuarios" size={18}/><span>Usuários</span></button><button onClick={logout}><Ico name="logout" size={18}/><span>Sair</span></button><div className="profile"><div className="avatar">{initials}</div><div><b>{displayName}</b><small>{roleLabel}</small></div></div></div>
+   <div className="drawerBottom"><span className="navLabel">Conta</span>{canInstall&&<button onClick={doInstall}><Ico name="download" size={18}/><span>Instalar aplicativo</span></button>}<button onClick={()=>{setSecurityOpen(true);setMenu(false)}}><Ico name="shield" size={18}/><span>Segurança da conta</span></button><button onClick={()=>{setLegalOpen('terms');setMenu(false)}}><Ico name="file" size={18}/><span>Termos e política</span></button><button onClick={()=>{setShowUsers(true);setMenu(false)}}><Ico name="usuarios" size={18}/><span>Usuários</span></button><button onClick={logout}><Ico name="logout" size={18}/><span>Sair</span></button><div className="profile"><div className="avatar">{initials}</div><div><b>{displayName}</b><small>{roleLabel}</small></div></div></div>
   </aside>
   {menu&&<div className="overlay" onClick={()=>setMenu(false)}></div>}
   <div className="appBody">
@@ -240,6 +217,7 @@ function App({session,profile}){
     <button className="topSearch" onClick={()=>setPalette(true)} aria-label="Buscar ou ir para"><Ico name="search" size={16}/><span>Buscar ou ir para…</span><kbd>{isMac?'⌘K':'Ctrl K'}</kbd></button>
     <div className="topActions"><button className="ghost" onClick={toggleTheme} title={light?'Tema escuro':'Tema claro'} aria-label="Alternar tema"><Ico name={light?'moon':'sun'} size={17}/></button><div className="user"><div className="avatar">{initials}</div><div><b>{displayName}</b><small>{roleLabel}</small></div></div></div></header>
    <main className="main">
+    {privileged&&mfa.loaded&&!mfa.hasFactor&&<div className="securityBanner" role="alert"><Ico name="shield" size={20}/><div><b>Proteja sua conta</b><small>Ative a verificação em duas etapas. Contas de administração e gestão devem usá-la.</small></div><button className="primary" onClick={()=>setSecurityOpen(true)}>Ativar agora</button></div>}
     <InstallBanner install={install} force={forceBanner} onClose={()=>setForceBanner(false)}/>
     {page!=='dashboard'&&<div className="heading"><div><p className="eyebrow">{eyebrow.toUpperCase()}</p><h1>{title}</h1><p className="muted">{desc}</p></div>{page==='solicitacoes'&&<button className="primary headingAction" onClick={()=>setNewRequestSignal(v=>v+1)}>＋ Nova solicitação</button>}</div>}
     {page==='dashboard'&&<Dashboard currentUser={profile}/>}
@@ -252,6 +230,10 @@ function App({session,profile}){
    </main>
   </div>
   <nav className="bottomNav" aria-label="Navegação rápida">{bottom.map(([id,label])=><button key={id} className={page===id?'active':''} onClick={()=>go(id)} aria-current={page===id?'page':undefined}><Ico name={id} size={21}/><span>{label}</span></button>)}<button className={menu?'active':''} onClick={()=>setMenu(true)}><Ico name="menu" size={21}/><span>Mais</span></button></nav>
+  {securityOpen&&<SecurityCenter session={session} profile={profile} mfa={mfa} onClose={()=>setSecurityOpen(false)} onOpenLegal={w=>{setSecurityOpen(false);setLegalOpen(w)}}/>}
+  {legalOpen&&<LegalModal initial={legalOpen} onClose={()=>setLegalOpen(null)}/>}
+  <IdleWarning left={idle.left} onStay={idle.stay} onLeave={logout}/>
+  <TermsGate userId={profile.id} onSignOut={logout}/>
   <CommandPalette open={palette} onClose={()=>setPalette(false)} onGo={go} onTheme={toggleTheme} onLogout={logout} onInstall={doInstall} canInstall={canInstall} light={light}/>
  </div>
 }
@@ -744,7 +726,7 @@ function UserManager({onClose}){
  const openNew=()=>{setForm({id:'',name:'',email:'',role:'colaborador',status:'ativo',password:''});setMsg('');setModal('new')};
  const openEdit=(u)=>{setForm({id:u.id,name:u.full_name,email:u.email,role:u.role,status:u.status,password:''});setMsg('');setModal('edit')};
  const openPermissions=async(u)=>{setForm({id:u.id,name:u.full_name,email:u.email,role:u.role,status:u.status,password:''});setMsg('');const {data}=await supabase.from('user_permissions').select('*').eq('user_id',u.id);const map={};(data||[]).forEach(x=>map[x.module]={view:x.can_view,create:x.can_create,edit:x.can_edit,delete:x.can_delete});setPermissions(map);setModal('permissions')};
- const create=async e=>{e.preventDefault();setBusy(true);setMsg('');const res=await supabase.functions.invoke('admin-create-user',{body:{name:form.name,email:form.email,role:form.role,password:form.password}});if(res.error){setMsg(res.error.message||'Não foi possível criar o usuário.')}else{setMsg('Usuário criado com sucesso.');await load();setTimeout(()=>setModal(null),700)}setBusy(false)};
+ const create=async e=>{e.preventDefault();setMsg('');const pr=passwordProblem(form.password,{email:form.email,name:form.name});if(pr){setMsg(pr);return}setBusy(true);const res=await supabase.functions.invoke('admin-create-user',{body:{name:form.name,email:form.email,role:form.role,password:form.password}});if(res.error||res.data?.error){setMsg(await readFnError(res,'Não foi possível criar o usuário.'))}else{setMsg('Usuário criado com sucesso.');await load();setTimeout(()=>setModal(null),700)}setBusy(false)};
  const update=async e=>{e.preventDefault();setBusy(true);setMsg('');const {error}=await supabase.from('profiles').update({full_name:form.name,email:form.email,role:form.role,status:form.status,updated_at:new Date().toISOString()}).eq('id',form.id);if(error)setMsg('Não foi possível salvar as alterações.');else{setMsg('Alterações salvas.');await load();setTimeout(()=>setModal(null),700)}setBusy(false)};
  const toggleStatus=async(u)=>{const next=u.status==='ativo'?'inativo':'ativo';const {error}=await supabase.from('profiles').update({status:next,updated_at:new Date().toISOString()}).eq('id',u.id);if(!error)load()};
  const savePermissions=async()=>{setBusy(true);setMsg('');await supabase.from('user_permissions').delete().eq('user_id',form.id);const rows=[];modules.forEach(m=>{const x=permissions[m]||{};if(x.view||x.create||x.edit||x.delete)rows.push({user_id:form.id,module:m,can_view:!!x.view,can_create:!!x.create,can_edit:!!x.edit,can_delete:!!x.delete})});const {error}=rows.length?await supabase.from('user_permissions').insert(rows):{error:null};if(error)setMsg('Não foi possível salvar as permissões.');else{setMsg('Permissões salvas.');setTimeout(()=>setModal(null),700)}setBusy(false)};
@@ -752,7 +734,7 @@ function UserManager({onClose}){
  return <div className="modalWrap wide"><div className="modal userModal"><div className="modalHead"><div><p className="eyebrow">ADMINISTRAÇÃO</p><h2>Usuários ELO</h2><span>Controle interno de acessos, perfis e permissões.</span></div><button onClick={onClose}>×</button></div>
  <div className="userToolbar"><div className="search">⌕ <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar usuário..."/></div><button className="primary" onClick={openNew}>＋ Novo usuário</button></div>
  <div className="userTable"><div className="userRow head"><span>Usuário</span><span>Perfil</span><span>Status</span><span>Cadastro</span><span></span></div>{loading?<div className="emptyState">Carregando usuários…</div>:filtered.map(u=><div className="userRow" key={u.id}><span><b>{u.full_name}</b><small>{u.email}</small></span><span className="rolePill">{u.role}</span><span><i className={'statusDot '+u.status}></i>{u.status}</span><span>{new Date(u.created_at).toLocaleDateString('pt-BR')}</span><span className="userActions"><button onClick={()=>openPermissions(u)} title="Permissões">⚿</button><button onClick={()=>openEdit(u)} title="Editar">✎</button><button onClick={()=>toggleStatus(u)} title={u.status==='ativo'?'Inativar':'Ativar'}>{u.status==='ativo'?'◉':'○'}</button></span></div>)}{!loading&&!filtered.length&&<div className="emptyState">Nenhum usuário encontrado.</div>}</div>
- {modal==='new'&&<div className="subModal"><div className="modalHead"><div><h2>Novo usuário</h2><span>O acesso é criado exclusivamente pelo administrador.</span></div><button onClick={()=>setModal(null)}>×</button></div><form onSubmit={create} className="userForm"><label>Nome completo<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/></label><label>E-mail<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required/></label><label>Senha inicial<input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} minLength={8} required placeholder="Mínimo de 8 caracteres"/></label><label>Perfil<select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}><option value="administrador">Administrador</option><option value="gestor">Gestor</option><option value="supervisor">Supervisor</option><option value="colaborador">Colaborador</option></select></label>{msg&&<div className="notice">{msg}</div>}<div className="formActions"><button type="button" className="secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="primary" disabled={busy}>{busy?'Criando…':'Criar usuário'}</button></div></form></div>}
+ {modal==='new'&&<div className="subModal"><div className="modalHead"><div><h2>Novo usuário</h2><span>O acesso é criado exclusivamente pelo administrador.</span></div><button onClick={()=>setModal(null)}>×</button></div><form onSubmit={create} className="userForm"><label>Nome completo<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/></label><label>E-mail<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required/></label><label>Senha inicial<input type="password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} minLength={10} required autoComplete="new-password" placeholder="Mínimo de 10 caracteres"/></label><PasswordMeter password={form.password} email={form.email} name={form.name}/><label>Perfil<select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}><option value="administrador">Administrador</option><option value="gestor">Gestor</option><option value="supervisor">Supervisor</option><option value="colaborador">Colaborador</option></select></label>{msg&&<div className="notice">{msg}</div>}<div className="formActions"><button type="button" className="secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="primary" disabled={busy}>{busy?'Criando…':'Criar usuário'}</button></div></form></div>}
  {modal==='edit'&&<div className="subModal"><div className="modalHead"><div><h2>Editar usuário</h2><span>{form.email}</span></div><button onClick={()=>setModal(null)}>×</button></div><form onSubmit={update} className="userForm"><label>Nome completo<input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} required/></label><label>E-mail<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required/></label><label>Perfil<select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}><option value="administrador">Administrador</option><option value="gestor">Gestor</option><option value="supervisor">Supervisor</option><option value="colaborador">Colaborador</option></select></label><label>Status<select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}><option value="ativo">Ativo</option><option value="inativo">Inativo</option></select></label>{msg&&<div className="notice">{msg}</div>}<div className="formActions"><button type="button" className="secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="primary" disabled={busy}>{busy?'Salvando…':'Salvar alterações'}</button></div></form></div>}
  {modal==='permissions'&&<div className="subModal permissionsModal"><div className="modalHead"><div><h2>Permissões</h2><span>{form.name} · controle por módulo</span></div><button onClick={()=>setModal(null)}>×</button></div><div className="permGrid"><div className="permHead"><span>Módulo</span><span>Ver</span><span>Criar</span><span>Editar</span><span>Excluir</span></div>{modules.map(m=><div className="permRow" key={m}><b>{labels[m]}</b>{['view','create','edit','delete'].map(k=><label key={k}><input type="checkbox" checked={!!permissions[m]?.[k]} onChange={e=>setPermissions({...permissions,[m]:{...(permissions[m]||{}),[k]:e.target.checked}})}/></label>)}</div>)}</div>{msg&&<div className="notice">{msg}</div>}<div className="formActions"><button className="secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="primary" disabled={busy} onClick={savePermissions}>{busy?'Salvando…':'Salvar permissões'}</button></div></div>}
  </div></div>
@@ -761,41 +743,39 @@ function Root(){
  const [session,setSession]=useState(undefined);
  const [profile,setProfile]=useState(null);
  const [authError,setAuthError]=useState('');
+ const [mfaPending,setMfaPending]=useState(false);
  const [resetRoute,setResetRoute]=useState(()=>new URLSearchParams(window.location.search).get('reset-password')==='1');
  const returnToLogin=async()=>{
    if(supabase)await supabase.auth.signOut();
    window.history.replaceState({},document.title,window.location.pathname);
-   setResetRoute(false);setSession(null);setProfile(null);
+   setResetRoute(false);setSession(null);setProfile(null);setMfaPending(false);
+ };
+ // Sessão que ainda precisa do código de 2 etapas (usuário com 2FA) não acessa o sistema
+ const needsMfa=async()=>{try{const {data}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();return !!data&&data.nextLevel==='aal2'&&data.currentLevel!=='aal2'}catch{return false}};
+ const handleSession=async(s)=>{
+   setSession(s);
+   if(!s){setProfile(null);setMfaPending(false);return}
+   if(await needsMfa()){setProfile(null);setMfaPending(true);return}
+   setMfaPending(false);
+   const {data,error}=await supabase.from('profiles').select('*').eq('id',s.user.id).single();
+   if(error||!data||data.status!=='ativo'){
+     await supabase.auth.signOut();
+     setSession(null);setProfile(null);
+     setAuthError('Seu acesso não está ativo. Procure o administrador do ELO.');
+     return;
+   }
+   setProfile(data);setAuthError('');
  };
  const loadSession=async()=>{
    if(!supabase){setSession(null);return}
    const {data:{session}}=await supabase.auth.getSession();
-   setSession(session);
-   if(session){
-     const {data,error}=await supabase.from('profiles').select('*').eq('id',session.user.id).single();
-     if(error||!data||data.status!=='ativo'){
-       await supabase.auth.signOut();
-       setSession(null);setProfile(null);
-       setAuthError('Seu acesso não está ativo. Procure o administrador do ELO.');
-       return;
-     }
-     setProfile(data);
-   }
+   await handleSession(session);
  };
  useEffect(()=>{
    if(!supabase){setSession(null);return}
    loadSession();
-   const {data:{subscription}}=supabase.auth.onAuthStateChange(async (_e,s)=>{
-     setSession(s);
-     if(s){
-       const {data,error}=await supabase.from('profiles').select('*').eq('id',s.user.id).single();
-       if(error||!data||data.status!=='ativo'){
-         await supabase.auth.signOut();
-         setSession(null);setProfile(null);
-         setAuthError('Seu acesso não está ativo. Procure o administrador do ELO.');
-       }else{setProfile(data);setAuthError('')}
-     }else setProfile(null);
-   });
+   // setTimeout evita chamar o Auth de dentro do próprio callback (risco de travamento)
+   const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>{setTimeout(()=>{handleSession(s)},0)});
    return()=>subscription.unsubscribe();
  },[]);
  if(resetRoute){
@@ -803,7 +783,8 @@ function Root(){
    return <ResetPassword onBack={returnToLogin} hasSession={!!session}/>;
  }
  if(session===undefined)return <div className="loading">Carregando ELO…</div>;
- if(!session)return <Login onLogin={setSession}/>;
+ if(!session)return <Login onLogin={handleSession} authError={authError}/>;
+ if(mfaPending)return <MfaChallenge onVerified={()=>loadSession()} onCancel={async()=>{await supabase.auth.signOut()}}/>;
  if(!profile)return <div className="loading">Validando acesso…</div>;
  return <App session={session} profile={profile}/>;
 }

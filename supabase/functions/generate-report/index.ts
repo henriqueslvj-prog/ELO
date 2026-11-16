@@ -1,12 +1,47 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
-const cors = {
-  'Access-Control-Allow-Origin': '*',
+// ---- Segurança comum (V0.22): CORS restrito, erros sem detalhes internos, sessão válida e limite de uso ----
+const ALLOWED_ORIGINS = (Deno.env.get('ALLOWED_ORIGINS') || '').split(',').map((s) => s.trim()).filter(Boolean);
+let CURRENT_ORIGIN = '*';
+const setOrigin = (req: Request) => {
+  const origin = req.headers.get('Origin') || '';
+  CURRENT_ORIGIN = ALLOWED_ORIGINS.length ? (ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]) : '*';
+};
+const corsHeaders = () => ({
+  'Access-Control-Allow-Origin': CURRENT_ORIGIN,
+  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'X-Content-Type-Options': 'nosniff',
+  'Cache-Control': 'no-store',
+});
+const DEBUG_ERRORS = Deno.env.get('DEBUG_ERRORS') === 'true';
+const json = (body: any, status = 200) => {
+  if (status >= 500 && !DEBUG_ERRORS) {
+    console.error('Erro interno:', body?.error);
+    body = { error: 'Erro interno ao processar a solicitação. Tente novamente; se persistir, contate o administrador.' };
+  }
+  return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(), 'Content-Type': 'application/json' } });
 };
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
+// Bloqueia conta inativa e sessão sem 2FA concluído (quando o usuário tem 2FA) e aplica limite de uso por usuário.
+const guardRequest = async (userClient: any, adminClient: any, userId: string, bucket: string, limit: number, windowSeconds: number): Promise<Response | null> => {
+  try {
+    const { data: ok, error } = await userClient.rpc('elo_session_ok');
+    if (error) {
+      // função ainda não criada no banco (migração pendente): não bloqueia; qualquer outro erro bloqueia
+      if (!['PGRST202', '42883'].includes(String(error.code))) return json({ error: 'Não foi possível validar a sessão.' }, 503);
+    } else if (ok !== true) {
+      return json({ error: 'Acesso bloqueado: conta inativa ou verificação em duas etapas pendente.' }, 403);
+    }
+  } catch { return json({ error: 'Não foi possível validar a sessão.' }, 503); }
+  if (adminClient) {
+    try {
+      const { data: allowed, error } = await adminClient.rpc('check_rate_limit', { p_user: userId, p_bucket: bucket, p_limit: limit, p_window_seconds: windowSeconds });
+      if (!error && allowed === false) return json({ error: 'Limite de uso atingido. Aguarde alguns minutos e tente novamente.' }, 429);
+    } catch { /* sem limite se indisponível */ }
+  }
+  return null;
+};
 
 const isIso = (v: unknown) =>
   typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
@@ -125,7 +160,8 @@ const SOLUTIONS_RULES = `SOLUÇÕES (solicitadas pelo gestor)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  setOrigin(req);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders() });
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405);
 
   const url = Deno.env.get('SUPABASE_URL');
@@ -142,6 +178,11 @@ Deno.serve(async (req) => {
   const userClient = createClient(url, anon, { global: { headers: { Authorization: auth } } });
   const { data: userData, error: userError } = await userClient.auth.getUser();
   if (userError || !userData.user) return json({ error: 'Usuário não autenticado.' }, 401);
+  {
+    const guardAdmin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
+    const blocked = await guardRequest(userClient, guardAdmin, userData.user.id, 'generate-report', 30, 3600);
+    if (blocked) return blocked;
+  }
 
   let payload: any;
   try { payload = await req.json(); } catch { return json({ error: 'JSON inválido.' }, 400); }
