@@ -3,6 +3,7 @@
 **Sistema de Gestão, Organização e Resultados**  
 Versão 2026-11 · novembro de 2026
 
+> Modelo elaborado para uso interno. Antes de adotá-lo oficialmente, o texto deve ser revisado por assessoria jurídica e os campos entre colchetes [ ] (empresa, CNPJ, e-mails e foro) devem ser preenchidos.
 
 Estes Termos de Uso regulam o acesso e a utilização do sistema ELO, mantido por [RAZÃO SOCIAL DA EMPRESA] (CNPJ [CNPJ]), doravante "Empresa". Ao acessar o ELO, o usuário declara que leu, compreendeu e concorda com estes Termos e com a Política de Segurança e Privacidade.
 

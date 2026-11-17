@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1200" preserveAspectRatio="xMidYMid slice" width="1000" height="1200">
+ <defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020f0b"/><stop offset=".5" stop-color="#05311f"/><stop offset="1" stop-color="#0b7a52"/></linearGradient>
+  <radialGradient id="g1" cx=".82" cy=".10" r=".75"><stop offset="0" stop-color="#34f0a8" stop-opacity=".55"/><stop offset="1" stop-color="#34f0a8" stop-opacity="0"/></radialGradient>
+  <radialGradient id="g2" cx=".05" cy="1" r=".65"><stop offset="0" stop-color="#bff542" stop-opacity=".22"/><stop offset="1" stop-color="#d4f542" stop-opacity="0"/></radialGradient>
+  <linearGradient id="glassA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2fff9" stop-opacity=".78"/><stop offset=".42" stop-color="#6ff0bd" stop-opacity=".26"/><stop offset="1" stop-color="#d4f542" stop-opacity=".55"/></linearGradient>
+  <linearGradient id="glassB" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".70"/><stop offset=".5" stop-color="#3fe3a6" stop-opacity=".24"/><stop offset="1" stop-color="#c5ffe6" stop-opacity=".55"/></linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset="1" stop-color="#9dffd3" stop-opacity=".25"/></linearGradient>
+  <filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="26"/></filter>
+  <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="9"/></filter>
+  <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0"/></filter>
+  <path id="link" d="M-270 -120 h380 a120 120 0 0 1 0 240 h-380 a120 120 0 0 1 0 -240 z"/>
+ </defs>
+ <rect width="1000" height="1200" fill="url(#bg)"/><rect width="1000" height="1200" fill="url(#g1)"/><rect width="1000" height="1200" fill="url(#g2)"/>
+ <!-- partículas -->
+ <g fill="#eafff6">
+  <circle cx="140" cy="240" r="3" opacity=".7"/><circle cx="880" cy="640" r="2.4" opacity=".6"/><circle cx="220" cy="980" r="3.2" opacity=".5"/><circle cx="760" cy="150" r="2" opacity=".7"/><circle cx="90" cy="610" r="2" opacity=".5"/><circle cx="930" cy="1010" r="3" opacity=".5"/>
+ </g>
+ <!-- elo ao fundo (maior, cortado pela borda) -->
+ <g transform="translate(880 280) rotate(-38) scale(1.25)" opacity=".55">
+  <use href="#link" fill="none" stroke="url(#glassB)" stroke-width="120"/>
+  <use href="#link" fill="none" stroke="#021a13" stroke-opacity=".35" stroke-width="80"/>
+ </g>
+ <!-- elo 1 -->
+ <g transform="translate(610 560) rotate(-38) scale(1.12)">
+  <use href="#link" fill="none" stroke="#00110c" stroke-opacity=".55" stroke-width="130" filter="url(#soft)" transform="translate(30 46)"/>
+  <use href="#link" fill="none" stroke="url(#glassA)" stroke-width="128" stroke-linejoin="round"/>
+  <use href="#link" fill="none" stroke="#021a13" stroke-opacity=".45" stroke-width="88"/>
+  <use href="#link" fill="none" stroke="url(#rim)" stroke-width="3.5" transform="translate(-33 -33)"/>
+  <use href="#link" fill="none" stroke="#d4f542" stroke-opacity=".75" stroke-width="2.5" transform="translate(32 32)" filter="url(#glow)"/>
+  <use href="#link" fill="none" stroke="#e6ff7a" stroke-opacity=".7" stroke-width="2" transform="translate(32 32)"/>
+ </g>
+ <!-- elo 2 (à frente) -->
+ <g transform="translate(330 880) rotate(-38) scale(1.12)">
+  <use href="#link" fill="none" stroke="#00110c" stroke-opacity=".55" stroke-width="130" filter="url(#soft)" transform="translate(30 46)"/>
+  <use href="#link" fill="none" stroke="url(#glassB)" stroke-width="128" stroke-linejoin="round"/>
+  <use href="#link" fill="none" stroke="#021a13" stroke-opacity=".45" stroke-width="88"/>
+  <use href="#link" fill="none" stroke="url(#rim)" stroke-width="3.5" transform="translate(-33 -33)"/>
+  <use href="#link" fill="none" stroke="#7dffc8" stroke-opacity=".6" stroke-width="2" transform="translate(32 32)"/>
+ </g>
+ <rect width="1000" height="1200" filter="url(#grain)" opacity=".09"/>
+</svg>

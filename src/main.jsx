@@ -2,10 +2,11 @@ import React,{useEffect,useRef,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {supabase} from './supabaseClient.js';
 import {Ico} from './ico.jsx';
+import {AuthShell,Field,PasswordField,BrandLoader} from './auth.jsx';
 import {PasswordMeter,passwordProblem,lockRemaining,registerFailure,clearGuard,takeNotice,setNotice as storeNotice,readFnError,useIdleLogout,IdleWarning,MfaChallenge,useMfaStatus,LegalModal,TermsGate,SecurityCenter} from './security.jsx';
 import './styles.css';
 import logo from './assets/elo-logo.png';
-import mark from './assets/elo-mark.png';
+import mark from './assets/elo-mark-alpha.png';
 import grupoSystemLogo from './assets/grupo-system-logo.png';
 
 const NAV=[
@@ -33,7 +34,7 @@ function Login({onLogin,authError}){
  const [notice,setNotice]=useState('');
  const [mode,setMode]=useState('login');
  const [lock,setLock]=useState(lockRemaining());
- const [legal,setLegal]=useState(null);
+ const [accessInfo,setAccessInfo]=useState(false);
  useEffect(()=>{const n=takeNotice();if(n)setNotice(n)},[]);
  useEffect(()=>{if(authError)setError(authError)},[authError]);
  useEffect(()=>{if(lock<=0)return;const t=setInterval(()=>setLock(lockRemaining()),1000);return()=>clearInterval(t)},[lock>0]);
@@ -61,7 +62,25 @@ function Login({onLogin,authError}){
    if(error){setError('Não foi possível enviar o e-mail de recuperação. Verifique a configuração de URLs no Supabase e tente novamente.');return}
    setNotice('Se esse e-mail estiver cadastrado, você receberá um link para redefinir sua senha. Verifique também a caixa de spam.');
  };
- return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>{mode==='login'?'Acesso privado':'Recuperar senha'}</h1><p>{mode==='login'?'Entre com as credenciais fornecidas pelo administrador.':'Informe o e-mail vinculado à sua conta ELO para receber o link de recuperação.'}</p></div>{mode==='login'?<form onSubmit={submit}><label>E-mail<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username" placeholder="seu@email.com"/></label><label>Senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password" placeholder="••••••••"/></label>{error&&<div className="errorBox">{error}</div>}{notice&&<div className="notice">{notice}</div>}<button className="primary loginButton" disabled={loading||lock>0}>{loading?'Entrando…':lock>0?`Aguarde ${lock}s`:'Entrar no ELO'}</button><button type="button" className="textLink" onClick={()=>{setMode('recovery');setError('');setNotice('')}}>Esqueceu sua senha?</button></form>:<form onSubmit={sendReset}><label>E-mail cadastrado<input type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" placeholder="seu@email.com"/></label>{error&&<div className="errorBox">{error}</div>}{notice&&<div className="notice">{notice}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Enviando…':'Enviar link de recuperação'}</button><button type="button" className="textLink" onClick={()=>{setMode('login');setError('');setNotice('')}}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.<br/><button type="button" className="textLink inline" onClick={()=>setLegal('terms')}>Termos de Uso</button> · <button type="button" className="textLink inline" onClick={()=>setLegal('policy')}>Segurança e Privacidade</button></p></div>{legal&&<LegalModal initial={legal} onClose={()=>setLegal(null)}/>}</div>}
+ const ACCESS_EMAIL=(import.meta.env&&import.meta.env.VITE_ACCESS_EMAIL)||'';
+ return <AuthShell icon={mode==='login'?'login':'lock'} title={mode==='login'?'Faça login na sua conta':'Recuperar senha'} subtitle={mode==='login'?'Use seu e-mail corporativo e sua senha.':'Informe o e-mail da sua conta para receber o link de recuperação.'}>
+  {mode==='login'?<form onSubmit={submit} className="lgFormEl">
+   <Field id="lgEmail" label="E-mail" type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="username" placeholder="seu@email.com.br"/>
+   <PasswordField id="lgPass" label="Senha" value={password} onChange={e=>setPassword(e.target.value)} required autoComplete="current-password" placeholder="Sua senha"/>
+   <div className="lgRow"><button type="button" className="lgLink" onClick={()=>{setMode('recovery');setError('');setNotice('')}}>Esqueceu a senha?</button></div>
+   {error&&<div className="lgError" role="alert">{error}</div>}{notice&&<div className="lgNote" role="status">{notice}</div>}
+   <button className="lgPrimary" disabled={loading||lock>0}>{loading?'Entrando…':lock>0?`Aguarde ${lock}s`:'Fazer login'}</button>
+   <div className="lgDivider"><span>ou</span></div>
+   <button type="button" className="lgAccent" onClick={()=>setAccessInfo(v=>!v)} aria-expanded={accessInfo}>Solicitar acesso</button>
+   {accessInfo&&<div className="lgNote" role="note">O acesso ao ELO é liberado por um administrador. Peça o seu cadastro ao responsável da sua empresa{ACCESS_EMAIL?<> ou escreva para <a href={'mailto:'+ACCESS_EMAIL}>{ACCESS_EMAIL}</a></>:null}.</div>}
+  </form>:<form onSubmit={sendReset} className="lgFormEl">
+   <Field id="lgEmailR" label="E-mail cadastrado" type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" placeholder="seu@email.com.br"/>
+   {error&&<div className="lgError" role="alert">{error}</div>}{notice&&<div className="lgNote" role="status">{notice}</div>}
+   <button className="lgPrimary" disabled={loading}>{loading?'Enviando…':'Enviar link de recuperação'}</button>
+   <button type="button" className="lgLink center" onClick={()=>{setMode('login');setError('');setNotice('')}}>Voltar para o login</button>
+  </form>}
+ </AuthShell>}
+
 function ResetPassword({onBack,hasSession}){
  const [password,setPassword]=useState('');
  const [confirm,setConfirm]=useState('');
@@ -81,7 +100,19 @@ function ResetPassword({onBack,hasSession}){
    await supabase.auth.signOut();
    window.history.replaceState({},document.title,window.location.pathname);
  };
- return <div className="loginPage"><div className="loginGlow"></div><div className="loginCard"><img src={logo} className="loginLogo"/><div className="loginBrand">ELO</div><p className="loginTag">GESTÃO • ORGANIZAÇÃO • RESULTADOS</p><div className="loginIntro"><h1>Nova senha</h1><p>Crie uma nova senha para recuperar o acesso à sua conta.</p></div>{!hasSession?<><div className="errorBox">Este link de recuperação é inválido ou expirou. Solicite um novo link na tela de login.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:success?<><div className="notice">Senha alterada com sucesso. Você já pode entrar no ELO com a nova senha.</div><button className="primary loginButton" onClick={onBack}>Voltar para o login</button></>:<form onSubmit={save}><label>Nova senha<input type="password" value={password} onChange={e=>setPassword(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo de 10 caracteres"/></label><PasswordMeter password={password}/><label>Confirmar nova senha<input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Digite a senha novamente"/></label>{error&&<div className="errorBox">{error}</div>}<button className="primary loginButton" disabled={loading}>{loading?'Salvando…':'Salvar nova senha'}</button><button type="button" className="textLink" onClick={onBack}>Voltar para o login</button></form>}<p className="loginFooter">Acesso restrito a usuários autorizados.</p></div></div>}
+ return <AuthShell icon="lock" title="Criar nova senha" subtitle="Defina uma nova senha para recuperar o acesso à sua conta.">
+  {!hasSession?<div className="lgFormEl"><div className="lgError" role="alert">Este link de recuperação é inválido ou expirou. Solicite um novo link na tela de login.</div><button className="lgPrimary" onClick={onBack}>Voltar para o login</button></div>
+  :success?<div className="lgFormEl"><div className="lgNote" role="status">Senha alterada com sucesso. Você já pode entrar no ELO com a nova senha.</div><button className="lgPrimary" onClick={onBack}>Voltar para o login</button></div>
+  :<form onSubmit={save} className="lgFormEl">
+   <PasswordField id="lgNew" label="Nova senha" value={password} onChange={e=>setPassword(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Mínimo de 10 caracteres"/>
+   <PasswordMeter password={password}/>
+   <PasswordField id="lgConf" label="Confirmar nova senha" value={confirm} onChange={e=>setConfirm(e.target.value)} required minLength={10} autoComplete="new-password" placeholder="Digite a senha novamente"/>
+   {error&&<div className="lgError" role="alert">{error}</div>}
+   <button className="lgPrimary" disabled={loading}>{loading?'Salvando…':'Salvar nova senha'}</button>
+   <button type="button" className="lgLink center" onClick={onBack}>Voltar para o login</button>
+  </form>}
+ </AuthShell>}
+
 function useOnline(){
  const [on,setOn]=useState(typeof navigator==='undefined'?true:navigator.onLine);
  useEffect(()=>{const a=()=>setOn(true),b=()=>setOn(false);window.addEventListener('online',a);window.addEventListener('offline',b);return()=>{window.removeEventListener('online',a);window.removeEventListener('offline',b)}},[]);
@@ -779,13 +810,13 @@ function Root(){
    return()=>subscription.unsubscribe();
  },[]);
  if(resetRoute){
-   if(session===undefined)return <div className="loading">Validando link de recuperação…</div>;
+   if(session===undefined)return <BrandLoader text="Validando link de recuperação…"/>;
    return <ResetPassword onBack={returnToLogin} hasSession={!!session}/>;
  }
- if(session===undefined)return <div className="loading">Carregando ELO…</div>;
+ if(session===undefined)return <BrandLoader text="Carregando ELO…"/>;
  if(!session)return <Login onLogin={handleSession} authError={authError}/>;
  if(mfaPending)return <MfaChallenge onVerified={()=>loadSession()} onCancel={async()=>{await supabase.auth.signOut()}}/>;
- if(!profile)return <div className="loading">Validando acesso…</div>;
+ if(!profile)return <BrandLoader text="Validando acesso…"/>;
  return <App session={session} profile={profile}/>;
 }
 createRoot(document.getElementById('root')).render(<Root/>);

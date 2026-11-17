@@ -1167,3 +1167,104 @@ html{overscroll-behavior-y:none;-webkit-text-size-adjust:100%}
  body.printing-legal .legalBody h2,body.printing-legal .legalBody h3,body.printing-legal .legalBody p,body.printing-legal .legalBody li,body.printing-legal .legalSub,body.printing-legal .legalTable td,body.printing-legal .legalTable th{color:#111!important;visibility:visible}
  body.printing-legal .legalScroll,body.printing-legal .legalScroll *{visibility:visible}
 }
+
+/* =====================================================================
+   ELO V0.23 — Identidade visual: telas de acesso, marca e tipografia
+   Paleta: Verde Elo #08804f · Esmeralda #1fb575 · Menta #34f0a8 · Lima Spark #d4f542 · Grafite #0b0e12 · Névoa #f1f4f2
+   Tipografia: Sora (títulos e números) + Inter (texto)
+   ===================================================================== */
+.lg{--p:#0b0f13;--ink:#eef3f7;--muted:#8a96a3;--line:rgba(255,255,255,.24);--line-h:rgba(255,255,255,.42);--field:#10151b;--focus:#34f0a8;--brand:#08804f;--brand-h:#066f44;--lime:#d4f542;--err-bg:rgba(229,100,90,.12);--err:#ff9d95;--note-bg:rgba(31,181,117,.12);--note:#86ecc3;
+ display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);min-height:100vh;min-height:100dvh;background:var(--p);color:var(--ink);font-family:Inter,system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased}
+.lg.light{--p:#f1f4f2;--ink:#0f1a14;--muted:#566a5f;--line:rgba(8,128,79,.55);--line-h:#08804f;--field:#ffffff;--focus:#08804f;--err-bg:#fdecea;--err:#a1271d;--note-bg:#e4f5ec;--note:#0b5c3a}
+.lg *,.lg *::before,.lg *::after{box-sizing:border-box}
+.lgArt{position:relative;overflow:hidden;min-height:100%;isolation:isolate;background:#04140f}
+.lgArtSvg{position:absolute;inset:0;width:100%;height:100%;z-index:-1}
+.lgArtTop{position:absolute;left:44px;top:38px;display:flex;align-items:center;gap:12px;font:700 20px Sora,Inter,sans-serif;letter-spacing:.22em;color:#fff}
+.lgArtTop img{display:block;filter:drop-shadow(0 4px 14px rgba(0,0,0,.35))}
+.lgArtCopy{position:absolute;left:44px;right:44px;bottom:48px;max-width:540px;color:#eafff6}
+.lgKicker{margin:0 0 14px;font:600 11px Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:#bff5dc}
+.lgArtCopy h2{margin:0 0 14px;font:700 clamp(26px,3.1vw,42px)/1.1 Sora,Inter,sans-serif;letter-spacing:-.025em;text-shadow:0 2px 28px rgba(0,0,0,.4)}
+.lgArtCopy h2 em{font-style:normal;color:#d4f542}
+.lgLead{margin:0 0 20px;max-width:450px;font-size:14.5px;line-height:1.65;color:#d3f2e4}
+.lgChips{list-style:none;margin:0;padding:0;display:flex;gap:8px;flex-wrap:wrap}
+.lgChips li{padding:7px 13px;border-radius:99px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font-size:12px;font-weight:600;color:#f1fff8}
+.lgFloat1{animation:lgFloat 15s ease-in-out infinite}.lgFloat2{animation:lgFloat 19s ease-in-out -4s infinite}.lgFloat3{animation:lgFloat 23s ease-in-out -9s infinite}
+@keyframes lgFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+.lgPanel{position:relative;display:flex;flex-direction:column;justify-content:space-between;min-width:0;padding:26px clamp(24px,5vw,76px) 22px}
+.lgTheme{position:absolute;right:22px;top:20px;display:grid;place-items:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;opacity:.85;transition:opacity .15s,border-color .15s}
+.lgTheme:hover{opacity:1;border-color:var(--line-h)}
+.lgMobileBrand{display:none}
+.lgForm{width:min(400px,100%);margin:auto;padding:34px 0 22px}
+.lgIcon{display:grid;place-items:center;width:48px;height:48px;margin-bottom:22px;border-radius:14px;color:#34f0a8;background:rgba(8,128,79,.16);border:1px solid rgba(52,240,168,.28)}
+.lg.light .lgIcon{color:#08804f;background:#dff3e8;border-color:#b6e0c8}
+.lgTitle{margin:0 0 8px;font:700 clamp(24px,2.4vw,31px)/1.15 Sora,Inter,sans-serif;letter-spacing:-.025em}
+.lgSub{margin:0 0 28px;font-size:14px;line-height:1.55;color:var(--muted)}
+.lgFormEl{display:grid;gap:20px}
+.lgField{position:relative}
+.lgField input{display:block;width:100%;height:52px;padding:0 16px;border:1.5px solid var(--line);border-radius:10px;background:var(--field);color:var(--ink);font:500 15px Inter,sans-serif;outline:0;transition:border-color .15s,box-shadow .15s}
+.lgField input::placeholder{color:var(--muted);opacity:.65}
+.lgField input:hover{border-color:var(--line-h)}
+.lgField input:focus{border-color:var(--focus);box-shadow:0 0 0 4px color-mix(in srgb,var(--focus) 22%,transparent)}
+.lgField label{position:absolute;left:12px;top:-8px;padding:0 6px;background:var(--p);font:600 11.5px Inter,sans-serif;letter-spacing:.02em;color:var(--muted);transition:color .15s;pointer-events:none}
+.lgField:focus-within label{color:var(--focus)}
+.lgField.hasEye input{padding-right:64px}
+.lgEye{position:absolute;right:-1.5px;top:-1.5px;bottom:-1.5px;display:grid;place-items:center;width:52px;border:0;border-radius:0 10px 10px 0;background:var(--brand);color:#fff;cursor:pointer;transition:background .15s}
+.lgEye:hover{background:var(--brand-h)}
+.lgCodeField input{text-align:center;letter-spacing:.5em;font:700 22px Sora,Inter,sans-serif;font-variant-numeric:tabular-nums;padding-left:calc(16px + .5em)}
+.lgRow{display:flex;justify-content:space-between;align-items:center;margin-top:-6px}
+.lgLink{padding:0;border:0;background:none;color:var(--ink);font:600 13px Inter,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer;opacity:.92}
+.lgLink:hover{color:var(--focus);opacity:1}
+.lgLink.center{display:block;margin:0 auto}
+.lgPrimary,.lgAccent{width:100%;height:50px;border:0;border-radius:10px;font:700 14.5px Inter,sans-serif;letter-spacing:.005em;cursor:pointer;transition:transform .08s,filter .15s,background .15s,box-shadow .15s}
+.lgPrimary{background:var(--brand);color:#fff;box-shadow:0 10px 26px rgba(8,128,79,.34),inset 0 1px 0 rgba(255,255,255,.2)}
+.lgPrimary:hover:not(:disabled){background:var(--brand-h)}
+.lgPrimary:disabled{opacity:.55;cursor:not-allowed}
+.lgAccent{background:var(--lime);color:#14200a;box-shadow:0 8px 22px rgba(212,245,66,.16)}
+.lgAccent:hover{filter:brightness(1.06)}
+.lgPrimary:active,.lgAccent:active{transform:translateY(1px)}
+.lgPrimary:focus-visible,.lgAccent:focus-visible,.lgLink:focus-visible,.lgEye:focus-visible,.lgTheme:focus-visible,.lgFootLinks button:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+.lgDivider{display:flex;align-items:center;gap:14px;font-size:12.5px;color:var(--muted)}
+.lgDivider::before,.lgDivider::after{content:"";flex:1;height:1px;background:var(--line);opacity:.7}
+.lgError,.lgNote{padding:12px 14px;border-radius:10px;font-size:13px;line-height:1.55}
+.lgError{background:var(--err-bg);color:var(--err);border:1px solid color-mix(in srgb,var(--err) 35%,transparent)}
+.lgNote{background:var(--note-bg);color:var(--note);border:1px solid color-mix(in srgb,var(--note) 30%,transparent)}
+.lgNote a{color:inherit;font-weight:700}
+.lgHint{margin:20px 0 0;font-size:12.5px;line-height:1.6;color:var(--muted);text-align:center}
+.lg .pwMeter{margin:-8px 0 0}.lg.light .pwBar{background:#d9e2dd}.lg.light .pwMeter ul{color:#566a5f}.lg.light .pwMeter li.ok{color:#08804f}
+.lgFoot{display:flex;justify-content:space-between;align-items:center;gap:14px 20px;flex-wrap:wrap;padding-top:18px;font-size:12px;color:var(--muted)}
+.lgFootBrand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.lgFootBrand b{font:700 13px Sora,Inter,sans-serif;letter-spacing:.2em;color:var(--ink)}
+.lgFootLinks{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap}
+.lgFootLinks button{padding:0;border:0;background:none;color:var(--muted);font:600 12px Inter,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.lgFootLinks button:hover{color:var(--ink)}
+.lgSecure{display:inline-flex;align-items:center;gap:6px}
+@media(max-width:960px){
+ .lg{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+ .lgArt{min-height:200px}.lgArtCopy{display:none}.lgArtTop{left:22px;top:20px}
+ .lgPanel{padding:10px 22px 18px}
+ .lgForm{margin:0 auto;padding:26px 0 18px}
+ .lgTheme{position:fixed;top:14px;right:14px;z-index:5;background:rgba(0,0,0,.32);border-color:rgba(255,255,255,.3);color:#fff}
+}
+@media(max-height:700px) and (min-width:961px){.lgForm{padding:14px 0}.lgSub{margin-bottom:20px}.lgFormEl{gap:16px}}
+@media(prefers-reduced-motion:reduce){.lgFloat1,.lgFloat2,.lgFloat3{animation:none}}
+/* Modal de termos aberto a partir do acesso */
+.lg .modalWrap{z-index:90}
+/* Carregamento com a marca */
+.lgLoader{position:fixed;inset:0;display:grid;place-content:center;justify-items:center;gap:20px;background:#0b0e12;color:#8a96a3;font:500 13px Inter,sans-serif}
+.lgLoader.light{background:#f1f4f2;color:#566a5f}
+.lgLoader p{margin:0}
+.lgLoaderMark{position:relative;display:grid;place-items:center;width:140px;height:140px}
+.lgLoaderMark i{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgba(52,240,168,.38);animation:lgPulse 2.2s ease-out infinite}
+.lgLoaderMark img{position:relative;animation:lgBreath 2.2s ease-in-out infinite}
+@keyframes lgPulse{0%{transform:scale(.55);opacity:.95}100%{transform:scale(1.15);opacity:0}}
+@keyframes lgBreath{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(52,240,168,0))}50%{transform:scale(1.07);filter:drop-shadow(0 0 20px rgba(52,240,168,.55))}}
+@media(prefers-reduced-motion:reduce){.lgLoaderMark i,.lgLoaderMark img{animation:none}}
+/* Tipografia e traços da marca dentro do sistema */
+.app .heading h1,.app .dxToolbar h2,.app .modalHead h2,.app .dxKpi strong,.app .dxMini strong,.app .dxDonutNum,.app .drawerHead .brand strong,.app .topBrand strong{font-family:Sora,Inter,system-ui,sans-serif;letter-spacing:-.02em}
+.app .drawerHead .brand strong{letter-spacing:.22em}
+.app .drawer nav button.active::before{background:linear-gradient(180deg,#34f0a8,#d4f542)}
+.app .drawerHead .brand img{background:none;width:auto;height:30px;border-radius:0}
+.dxKpi::after{background:linear-gradient(90deg,#1fb575,#d4f542 55%,transparent)}
+.lgArt::after{content:"";position:absolute;left:0;right:0;bottom:0;height:58%;z-index:0;background:linear-gradient(to top,rgba(2,15,11,.80) 0%,rgba(2,15,11,.45) 45%,transparent 100%);pointer-events:none}
+.lgArtTop,.lgArtCopy{z-index:1}
+@media(max-width:960px){.lgArt::after{display:none}}
+.app .topBrand img{width:auto;height:26px;border-radius:0}
